@@ -1,0 +1,3 @@
+# Non-secret defaults can live here if you prefer; secrets stay in local.secrets.tfvars.
+# Typical invoke:
+#   terraform plan -var-file=local.secrets.tfvars
