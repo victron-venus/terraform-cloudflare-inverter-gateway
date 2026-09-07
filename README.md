@@ -1,6 +1,6 @@
 # terraform-cloudflare-inverter-gateway
 
-Terraform for Cloudflare **Zero Trust Access** in front of [`inverter-gateway`](https://github.com/victron-venus/inverter-gateway) (public hostname `victron.2560801.xyz` behind Cloudflare Tunnel).
+Terraform for Cloudflare **Zero Trust Access** in front of [`inverter-gateway`](https://github.com/victron-venus/inverter-gateway) behind Cloudflare Tunnel.
 
 Manages:
 
@@ -41,7 +41,7 @@ Or set `account_xyz` / `email_xyz` / `key_xyz` in `local.secrets.tfvars` (never 
 
 ## Existing dashboard resources
 
-If you already created the Access app / email policy in the UI (as with `victron.2560801.xyz`), **import** them instead of recreating — see `import.example.sh`. Then let Terraform create the Service Token (or import that too).
+If you already created the Access app / email policy in the UI (as with your existing public hostname), **import** them instead of recreating — see `import.example.sh`. Then let Terraform create the Service Token (or import that too).
 
 ## Tunnel JWT enforce
 
