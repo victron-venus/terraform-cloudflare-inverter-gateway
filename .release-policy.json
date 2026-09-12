@@ -1,0 +1,25 @@
+{
+  "repository": "victron-venus/terraform-cloudflare-inverter-gateway",
+  "mode": "validation-only",
+  "default_branch": "main",
+  "validation_workflows": [
+    "validate.yml",
+    "codeql.yml"
+  ],
+  "local_checks": [
+    "bash scripts/ci.sh"
+  ],
+  "notes": [
+    "Validation-only policy: no synthetic beta/RC artifacts or tag-triggered stable releases.",
+    "Terraform fmt/validate use disposable source copies with backend disabled; no plan, apply, remote-state or live-provider checks. Portainer uses redacted compose fixtures. Inventory and archived monolith are excluded.",
+    "Dependency review remains a PR-only comparison; callable full-source validation workflows run for nightly and candidate checks."
+  ],
+  "terraform_roots": [
+    "."
+  ],
+  "syntax_exclude": [
+    "inventory",
+    "terraform/_archived_monolith"
+  ],
+  "visibility": "public"
+}
