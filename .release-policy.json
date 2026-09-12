@@ -20,5 +20,6 @@
   "syntax_exclude": [
     "inventory",
     "terraform/_archived_monolith"
-  ]
+  ],
+  "visibility": "public"
 }
