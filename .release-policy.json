@@ -4,7 +4,9 @@
   "default_branch": "main",
   "validation_workflows": [
     "validate.yml",
-    "codeql.yml"
+    "codeql.yml",
+    "dependency-review.yml",
+    "workflow-validation.yml"
   ],
   "local_checks": [
     "bash scripts/ci.sh"
@@ -21,5 +23,6 @@
     "inventory",
     "terraform/_archived_monolith"
   ],
-  "visibility": "public"
+  "visibility": "public",
+  "single_entry_ci": true
 }
