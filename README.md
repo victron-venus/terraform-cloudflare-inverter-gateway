@@ -11,7 +11,11 @@ Manages:
 
 Optional (off by default): tunnel ingress with **Enforce Access JWT** (`origin_request.access`).
 
-> Relocated from [`open-ott-play/foss-cloudflare-infrastructure`](https://github.com/open-ott-play/foss-cloudflare-infrastructure).
+> Originally relocated from `open-ott-play/foss-cloudflare-infrastructure`,
+> retired after migration verification on 2026-10-03. This repository preserves
+> the reusable gateway module and local secret-file generation. The live
+> `victron.2560801.xyz` Access application, policies and tunnel route are owned by
+> [`4alvit/terraform-cloudflare-alvit`](https://github.com/4alvit/terraform-cloudflare-alvit).
 
 <!-- ci-release-process:start -->
 ## CI and deployment
