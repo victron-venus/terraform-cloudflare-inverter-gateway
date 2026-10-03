@@ -16,3 +16,7 @@ override.tf.json
 terraform.rc
 *.pem
 *.key
+
+# Generated Python CI helper caches
+__pycache__/
+*.py[cod]
