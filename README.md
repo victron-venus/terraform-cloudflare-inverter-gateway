@@ -11,11 +11,11 @@ Manages:
 
 Optional (off by default): tunnel ingress with **Enforce Access JWT** (`origin_request.access`).
 
-> Originally relocated from `open-ott-play/foss-cloudflare-infrastructure`,
-> retired after migration verification on 2026-10-03. This repository preserves
-> the reusable gateway module and local secret-file generation. The live
-> `victron.2560801.xyz` Access application, policies and tunnel route are owned by
-> [`4alvit/terraform-cloudflare-alvit`](https://github.com/4alvit/terraform-cloudflare-alvit).
+> This repository provides a reusable gateway module and local secret-file
+> generation. Manage live hostnames and existing Access resources through one
+> reviewed Terraform state; import existing resources before applying changes.
+> Deployment-specific ownership, state and credentials belong outside public
+> documentation.
 
 <!-- ci-release-process:start -->
 ## CI and deployment
@@ -96,4 +96,4 @@ Do not apply from both TFC and local against the same resources without coordina
 
 ## Repo provisioning
 
-GitHub repository is created under [`victron-venus`](https://github.com/victron-venus) and tracked by [`terraform-github-victron`](https://github.com/victron-venus/terraform-github-victron).
+GitHub repository is created under [`victron-venus`](https://github.com/victron-venus) and tracked by [`terraform-github-victron`](https://github.com/4alvit/terraform-github-victron).
