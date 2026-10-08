@@ -79,7 +79,7 @@ def main():
     root = Path(__file__).resolve().parents[1]
     policy = json.loads((root / ".release-policy.json").read_text())
     if not shutil.which("terraform"):
-        raise SystemExit("Install Terraform 1.15.7 before running scripts/ci.sh")
+        raise SystemExit("Install Terraform 1.16.5 before running scripts/ci.sh")
     with tempfile.TemporaryDirectory(prefix="terraform-ci-") as temporary:
         stage = Path(temporary) / "source"
         stage.mkdir()

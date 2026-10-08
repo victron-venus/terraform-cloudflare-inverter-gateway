@@ -26,7 +26,7 @@ migration. Their exact previous contents remain in `docs/legacy-workflows/`.
 Production deployment, where provided, requires manual dispatch from the default
 branch and the `production` environment; validation never deploys resources.
 
-Install Terraform 1.15.7. Checks copy the current tracked/non-ignored source into a temporary directory, materialize redacted compose fixtures where applicable, and run `terraform fmt -check`, `init -backend=false`, and `validate`. Provider installation requires registry network access. Local state and `.tfvars` are not copied; no plan or apply runs.
+Install Terraform 1.16.5. Checks copy the current tracked/non-ignored source into a temporary directory, materialize redacted compose fixtures where applicable, and run `terraform fmt -check`, `init -backend=false`, and `validate`. Provider installation requires registry network access. Local state and `.tfvars` are not copied; no plan or apply runs.
 
 ## Coverage limits
 
