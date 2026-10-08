@@ -97,3 +97,9 @@ Do not apply from both TFC and local against the same resources without coordina
 ## Repo provisioning
 
 GitHub repository is created under [`victron-venus`](https://github.com/victron-venus) and tracked by [`terraform-github-victron`](https://github.com/4alvit/terraform-github-victron).
+
+## Contributing and security
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for reports, development checks and pull requests,
+[SECURITY.md](SECURITY.md) for private vulnerability reporting and deployment trust boundaries,
+and the [OpenSSF evidence index](docs/openssf-evidence.md) for assessment references and remaining verification.
