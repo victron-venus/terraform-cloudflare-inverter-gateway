@@ -32,20 +32,22 @@ compiler and dependencies without silently changing operator state or locks.
 Its qualification is separate from the official-binary assessment, and the
 Terraform/OpenTofu engine still requires its own advisory review.
 
-The project therefore does not claim completed vulnerability-remediation
-criteria or a Passing badge from this change. It preserves the known provider
-lock rather than silently substituting a locally modified binary. Review a
-patched official build, or a transparently maintained/reproducible alternative,
-then repeat dependency scanning, mock-plan compatibility and TLS calibration.
-A source-level applicability review may narrow specific reports but must record
-why the vulnerable behavior is unreachable; an empty GitHub alerts page is not
-that evidence.
+The original provider binaries are not the recommended execution profile.
+The repository preserves its official lock for baseline comparisons; the
+[explicit local-state wrapper](SECURE_PROVIDER.md) instead selects the disclosed
+derivative from a verified filesystem-only mirror, with no registry fallback.
+Use that profile only after the exact derivative completes dependency scanning,
+upstream non-acceptance unit tests, all four mocked policy plans, and the real
+TLS/runtime-wrapper calibrations. A failed or incomplete stage is not evidence
+of remediation. No qualification result upgrades existing deployments or
+establishes the security of arbitrary remote backends and provider features.
 
-Until qualification is complete, keep the execution environment trusted, use
-verified HTTPS endpoints and private credentials/state, and do not treat the
-[strict TLS profile](TLS_PROFILE.md) as a complete vulnerability assessment.
-CI still enforces the source checks, policy tests, static configuration analysis
-and real transport calibration introduced by this change.
+Keep the execution environment trusted and credentials/state private. The
+[strict TLS profile](TLS_PROFILE.md) is one part of the assessment; it does not
+replace the dated engine/local-provider applicability review below. CI retains
+the source checks, policy tests, static configuration analysis and real
+transport calibration. An empty GitHub alerts page is not sufficient evidence
+for vulnerability-remediation criteria.
 
 ## Qualified engine scope
 
