@@ -11,6 +11,7 @@ import tarfile
 import tempfile
 import time
 import unittest
+from types import SimpleNamespace
 from pathlib import Path
 from unittest.mock import patch
 
@@ -55,6 +56,21 @@ class SecureProviderBuildTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             for name in names:
                 self.assertEqual((root / name).read_text(), "ran")
+
+    def test_standalone_retains_full_suite_with_multi_hour_budget(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            args = SimpleNamespace(test_shard=None, test_receipts=None)
+            with patch.object(MODULE, "run") as run:
+                result = MODULE.qualify_tests(
+                    "go", root, {}, root, args, {}, "go1.27.2"
+                )
+            self.assertEqual(result, {})
+            self.assertEqual(run.call_count, 1)
+            command = run.call_args.args[0]
+            self.assertEqual(command[-1], "./...")
+            self.assertIn("-count=1", command)
+            self.assertEqual(run.call_args.kwargs["timeout"], 12 * 60 * 60)
 
     def test_stage_output_is_retained_and_failure_still_propagates(self):
         with tempfile.TemporaryDirectory() as directory:

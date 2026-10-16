@@ -8,11 +8,11 @@ jobs:
   provider_unit_tests:
     name: Provider unit tests / shard ${{ matrix.shard }}
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 110
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
     steps:
       - name: Harden the runner (Audit all outbound calls)
         uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25
@@ -33,7 +33,7 @@ jobs:
           SHARD_INDEX: ${{ matrix.shard }}
           QUALIFICATION_ID: ${{ github.sha }}
         run: |
-          python3 scripts/build_secure_provider.py --go "$(command -v go)" --platform linux_amd64 --output "$RUNNER_TEMP/provider-shard" --test-shard "$SHARD_INDEX" --test-shards 8 --qualification-id "$QUALIFICATION_ID"
+          python3 scripts/build_secure_provider.py --go "$(command -v go)" --platform linux_amd64 --output "$RUNNER_TEMP/provider-shard" --test-shard "$SHARD_INDEX" --test-shards 16 --qualification-id "$QUALIFICATION_ID"
       - name: Preserve uniquely named diagnostics
         if: ${{ always() }}
         env:
@@ -143,7 +143,7 @@ jobs:
           QUALIFICATION_ID: ${{ github.sha }}
         run: |
           patched="$RUNNER_TEMP/cloudflare-patched"
-          python3 scripts/build_secure_provider.py --go "$(command -v go)" --platform linux_amd64 --output "$patched" --test-receipts "$RUNNER_TEMP/provider-unit-receipts" --test-shards 8 --qualification-id "$QUALIFICATION_ID"
+          python3 scripts/build_secure_provider.py --go "$(command -v go)" --platform linux_amd64 --output "$patched" --test-receipts "$RUNNER_TEMP/provider-unit-receipts" --test-shards 16 --qualification-id "$QUALIFICATION_ID"
           TLS_TEST_TERRAFORM="$(command -v terraform)" TLS_TEST_PROVIDER_DIR="$patched" TLS_TEST_PLATFORM=linux_amd64 "$RUNNER_TEMP/tls-test-venv/bin/python" scripts/test_tls_profile.py
           TLS_TEST_TERRAFORM="$RUNNER_TEMP/opentofu-1.13.1/tofu" TLS_TEST_PROVIDER_DIR="$patched" TLS_TEST_PLATFORM=linux_amd64 "$RUNNER_TEMP/tls-test-venv/bin/python" scripts/test_tls_profile.py
           python3 scripts/check_secure_provider.py --engine "$RUNNER_TEMP/opentofu-1.13.1/tofu" --provider-dir "$patched" --platform linux_amd64 --local-provider-archive "$RUNNER_TEMP/tls-provider-mirror/registry.terraform.io/hashicorp/local/terraform-provider-local_2.9.1_linux_amd64.zip"

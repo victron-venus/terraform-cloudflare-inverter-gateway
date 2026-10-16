@@ -98,7 +98,7 @@ class ProviderShardTests(unittest.TestCase):
             root = Path(directory)
             (root / "go.mod").write_text("module fixture\n\ngo 1.23\n")
             (root / "root.go").write_text("package fixture\n")
-            for index in range(6):
+            for index in range(16):
                 package = root / f"p{index}"
                 package.mkdir()
                 (package / "unit_test.go").write_text(
@@ -119,11 +119,11 @@ class ProviderShardTests(unittest.TestCase):
                     [go, "list", "./..."], cwd=root, env=environment, text=True
                 ).splitlines()
             )
-            self.assertEqual(len(packages), 7)
+            self.assertEqual(len(packages), 17)
             receipts = root / "receipts"
             receipts.mkdir()
-            for index in range(3):
-                selected = partition(packages, index, 3)
+            for index in range(16):
+                selected = partition(packages, index, 16)
                 result = subprocess.run(
                     BUILD.unit_test_command(go, selected),
                     cwd=root,
@@ -136,10 +136,10 @@ class ProviderShardTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 log = receipts / "current.log"
                 log.write_text(result.stdout + result.stderr)
-                write_receipt(receipts, {"fixture": True}, packages, index, 3, log)
-            summary = reconcile(receipts, {"fixture": True}, packages, 3)
-            self.assertEqual(summary["packages"], 7)
-            for index in range(6):
+                write_receipt(receipts, {"fixture": True}, packages, index, 16, log)
+            summary = reconcile(receipts, {"fixture": True}, packages, 16)
+            self.assertEqual(summary["packages"], 17)
+            for index in range(16):
                 self.assertEqual((root / f"p{index}" / "ran").read_text(), "yes")
 
     def test_workflow_requires_all_shards_before_production_and_transport(self):
@@ -148,8 +148,14 @@ class ProviderShardTests(unittest.TestCase):
         )
         shards = workflow["jobs"]["provider_unit_tests"]
         final = workflow["jobs"]["validate"]
-        self.assertEqual(shards["strategy"]["matrix"]["shard"], list(range(8)))
+        self.assertEqual(shards["strategy"]["matrix"]["shard"], list(range(16)))
         self.assertFalse(shards["strategy"]["fail-fast"])
+        self.assertEqual(shards["timeout-minutes"], 110)
+        shard_command = next(
+            step["run"] for step in shards["steps"]
+            if step.get("name") == "Test exact provider package partition"
+        )
+        self.assertIn("--test-shards 16", shard_command)
         self.assertEqual(final["needs"], "provider_unit_tests")
         guard = final["steps"][0]
         self.assertEqual(
@@ -169,7 +175,7 @@ class ProviderShardTests(unittest.TestCase):
             == "Build and qualify the disclosed provider security patch"
         )
         self.assertIn("--test-receipts", final_command)
-        self.assertIn("--test-shards 8", final_command)
+        self.assertIn("--test-shards 16", final_command)
         self.assertEqual(final_command.count("scripts/test_tls_profile.py"), 3)
         self.assertIn("scripts/check_secure_provider.py", final_command)
 

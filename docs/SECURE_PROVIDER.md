@@ -46,19 +46,25 @@ linking work; their assertions and package initialization remain unchanged.
 No Terraform command, provider installation, infrastructure change, or state
 access occurs.
 
-The standalone test stage has a 70-minute limit; other build stages have a
-one-hour limit. CI divides the complete `go list ./...` package inventory into
-eight disjoint, deterministic partitions on independent Ubuntu workers. It does
+The standalone test stage has a bounded 12-hour limit; other build stages have
+a one-hour limit. Allow several hours for a fresh full upstream test build on
+a small workstation. This is not a quick installation step: measured hosted
+runs needed up to 28 minutes before their first large package completed, and
+two 49–50-package partitions exceeded a 70-minute test budget. CI therefore
+divides the complete `go list ./...` package inventory into sixteen disjoint,
+deterministic partitions of 24–25 packages on independent Ubuntu workers. It does
 not remove test files, acceptance helpers, package initialization, packages
 without test files, or any unit-test assertions. Every partition uses the same
 `-short`, `-count=1` and acceptance-name filter described above. A shard writes
 only its logs and a success receipt; it cannot emit a production binary or claim
 that the entire suite passed.
 
-Each CI job has a 90-minute budget and retains logs even if a stage fails. The
+Each shard test stage has a 90-minute limit within a 110-minute job budget,
+leaving room for source preparation and diagnostic uploads. The final validation
+job retains its 90-minute budget. All jobs retain logs even if a stage fails. The
 final required validation job rejects any failed, skipped or cancelled matrix.
 Before its full production build, it independently enumerates the exact patched
-source again and checks all eight receipt indices, the exact non-overlapping
+source again and checks all sixteen receipt indices, the exact non-overlapping
 union, per-package Go result lines, and retained log hashes. Receipts must match
 the checkout commit, source archive and module hashes, compiler, native/target
 platforms, test command and qualification script hashes. Missing, duplicated,

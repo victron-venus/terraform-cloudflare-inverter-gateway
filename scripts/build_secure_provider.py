@@ -226,7 +226,7 @@ def qualify_tests(go, source, environment, output, args, manifest, actual):
     """Run the full suite, emit one shard receipt, or verify the full receipt set."""
     unit_log = output / "unit-tests.log"
     if args.test_shard is None and args.test_receipts is None:
-        run(unit_test_command(go), source, environment, unit_log, timeout=70 * 60)
+        run(unit_test_command(go), source, environment, unit_log, timeout=12 * 60 * 60)
         return {}
     run([go, "list", "./..."], source, environment, output / "packages.log")
     packages = checked_inventory(
@@ -258,7 +258,7 @@ def qualify_tests(go, source, environment, output, args, manifest, actual):
             source,
             environment,
             unit_log,
-            timeout=70 * 60,
+            timeout=90 * 60,
         )
         for name, expected in manifest["module_files"].items():
             if digest(source / name) != expected:
