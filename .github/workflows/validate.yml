@@ -37,3 +37,28 @@ jobs:
           printf '%s\n' "$RUNNER_TEMP" >> "$GITHUB_PATH"
       - name: Run local checks
         run: bash scripts/ci.sh
+      - name: Verify real Terraform and provider TLS boundaries
+        env:
+          TLS_TEST_PLATFORM: linux_amd64
+        run: |
+          python3 -m venv "$RUNNER_TEMP/tls-test-venv"
+          "$RUNNER_TEMP/tls-test-venv/bin/pip" install cryptography==50.0.2 cffi==2.1.1 pycparser==3.0
+          mirror="$RUNNER_TEMP/tls-provider-mirror"
+          terraform providers mirror -platform=linux_amd64 "$mirror"
+          provider_dir="$RUNNER_TEMP/tls-provider"
+          mkdir -p "$provider_dir"
+          unzip "$mirror/registry.terraform.io/cloudflare/cloudflare/terraform-provider-cloudflare_5.24.0_linux_amd64.zip" -d "$provider_dir"
+          export TLS_TEST_TERRAFORM="$(command -v terraform)"
+          export TLS_TEST_PROVIDER_DIR="$provider_dir"
+          go version -m "$TLS_TEST_TERRAFORM"
+          go version -m "$provider_dir/terraform-provider-cloudflare_v5.24.0"
+          "$RUNNER_TEMP/tls-test-venv/bin/python" scripts/test_tls_profile.py
+      - name: Validate the FLOSS OpenTofu compatibility profile
+        run: |
+          tofu_dir="$RUNNER_TEMP/opentofu-1.13.1"
+          mkdir -p "$tofu_dir"
+          curl --proto '=https' --proto-redir '=https' --fail --silent --show-error --location https://github.com/opentofu/opentofu/releases/download/v1.13.1/tofu_1.13.1_linux_amd64.zip -o "$tofu_dir/tofu.zip"
+          printf '%s  %s\n' '8ccbc6f8ee21d2827715f3c6e08a9b3e0209b1e62057c05067ef117e047c1a80' "$tofu_dir/tofu.zip" | sha256sum --check --strict
+          unzip "$tofu_dir/tofu.zip" -d "$tofu_dir"
+          TOFU_BIN="$tofu_dir/tofu" python3 scripts/check_opentofu.py
+          TLS_TEST_TERRAFORM="$tofu_dir/tofu" TLS_TEST_PROVIDER_DIR="$RUNNER_TEMP/tls-provider" TLS_TEST_PLATFORM=linux_amd64 "$RUNNER_TEMP/tls-test-venv/bin/python" scripts/test_tls_profile.py

@@ -23,12 +23,12 @@ SHA = "a" * 40
 
 
 def complete() -> dict[str, Any]:
-    """Build a complete result, including upstream disabled checks."""
+    """Build a complete result, including checks excluded by the SARIF policy."""
     return {
         "repo": {"name": f"github.com/{REPO}", "commit": SHA},
         "scorecard": guard.VERSION.copy(),
         "checks": [
-            {"name": name, "score": -1 if name in guard.DISABLED else 10}
+            {"name": name, "score": 10}
             for name in sorted(guard.CHECKS)
         ],
     }
@@ -43,43 +43,66 @@ class ScorecardJSONTests(unittest.TestCase):
             result["checks"][0]["score"] = score
             guard.validate(result, REPO, SHA)
 
-    def test_upstream_packaging_not_applicable_is_preserved(self) -> None:
-        result = complete()
-        check = next(
-            check for check in result["checks"] if check["name"] == "Packaging"
-        )
-        check.update(score=-1, reason=guard.PACKAGING_ABSENT)
+    def test_actual_v56_report_is_preserved(self) -> None:
+        fixture = Path(__file__).parent / "fixtures/scorecard-v5.6.0.json"
+        result = json.loads(fixture.read_text())
+        original = copy.deepcopy(result)
         guard.validate(result, REPO, SHA)
+        self.assertEqual(result, original)
 
-    def test_packaging_runtime_errors_and_other_inconclusive_results_fail(self) -> None:
-        changes = [
-            {"reason": "internal error: " + guard.PACKAGING_ABSENT},
-            {"reason": "Packaging workflow not detected"},
-            {"reason": None},
-            {"error": "API failed"},
-            {"score": -1.0},
-            {"name": "Binary-Artifacts"},
-        ]
-        for change in changes:
-            with self.subTest(change=change):
+    def test_upstream_not_applicable_results_are_preserved(self) -> None:
+        for name, reason in guard.NOT_APPLICABLE.items():
+            with self.subTest(name=name):
                 result = complete()
-                check = next(
-                    check
-                    for check in result["checks"]
-                    if check["name"] == change.get("name", "Packaging")
-                )
-                check.update(score=-1, reason=guard.PACKAGING_ABSENT)
-                check.update(change)
-                with self.assertRaises((TypeError, ValueError)):
-                    guard.validate(result, REPO, SHA)
+                check = next(c for c in result["checks"] if c["name"] == name)
+                check.update(score=-1, reason=reason)
+                guard.validate(result, REPO, SHA)
+
+    def test_runtime_errors_and_other_inconclusive_results_fail(self) -> None:
+        for name, reason in guard.NOT_APPLICABLE.items():
+            changes = [
+                {"reason": "internal error: " + reason},
+                {"reason": reason.upper()},
+                {"reason": None},
+                {"error": "API failed"},
+                {"score": -1.0},
+            ]
+            for change in changes:
+                with self.subTest(name=name, change=change):
+                    result = complete()
+                    check = next(c for c in result["checks"] if c["name"] == name)
+                    check.update(score=-1, reason=reason)
+                    check.update(change)
+                    with self.assertRaises((TypeError, ValueError)):
+                        guard.validate(result, REPO, SHA)
+
+    def test_not_applicable_reasons_cannot_be_used_by_other_checks(self) -> None:
+        for name in guard.CHECKS:
+            for allowed_name, reason in guard.NOT_APPLICABLE.items():
+                if name == allowed_name:
+                    continue
+                with self.subTest(name=name, reason=reason):
+                    result = complete()
+                    check = next(c for c in result["checks"] if c["name"] == name)
+                    check.update(score=-1, reason=reason)
+                    with self.assertRaises((TypeError, ValueError)):
+                        guard.validate(result, REPO, SHA)
 
     def test_invalid_or_incomplete_checks_fail(self) -> None:
-        for score in (-1, -2, 11, True, "10", None):
-            with self.subTest(score=score):
-                result = complete()
-                result["checks"][0]["score"] = score
-                with self.assertRaises((TypeError, ValueError)):
-                    guard.validate(result, REPO, SHA)
+        for name in guard.CHECKS:
+            for score in (-1, -2, 11, True, "10", None):
+                with self.subTest(name=name, score=score):
+                    result = complete()
+                    check = next(c for c in result["checks"] if c["name"] == name)
+                    check["score"] = score
+                    with self.assertRaises((TypeError, ValueError)):
+                        guard.validate(result, REPO, SHA)
+
+    def test_explicit_error_cannot_be_masked_by_valid_score(self) -> None:
+        result = complete()
+        result["checks"][0]["error"] = "API failed"
+        with self.assertRaises(ValueError):
+            guard.validate(result, REPO, SHA)
 
     def test_missing_duplicate_unknown_and_malformed_checks_fail(self) -> None:
         original = complete()
@@ -104,6 +127,7 @@ class ScorecardJSONTests(unittest.TestCase):
             ("repo", {"name": "github.com/other/repo", "commit": SHA}),
             ("repo", {"name": f"github.com/{REPO}", "commit": "b" * 40}),
             ("scorecard", {"version": "v9.0.0", "commit": "b" * 40}),
+            ("scorecard", {"version": guard.VERSION["version"], "commit": "b" * 40}),
         ):
             with self.subTest(field=field, value=value):
                 result = complete()

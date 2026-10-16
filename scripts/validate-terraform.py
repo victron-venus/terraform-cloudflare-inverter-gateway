@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Format/validate disposable source copies. Never plan/apply or read state."""
+"""Format/validate disposable source copies. Use only mocked, plan-only tests; never apply or read operator state."""
 
 # Preserve the existing operator-facing CLI filename.
 # pylint: disable=invalid-name
@@ -39,7 +39,10 @@ def isolated_environment(temporary):
     environment = {
         key: value
         for key, value in os.environ.items()
-        if not key.startswith(("TF_VAR_", "TF_TOKEN_", "TF_CLI_ARGS"))
+        if not key.startswith(
+            ("TF_VAR_", "TF_TOKEN_", "TF_CLI_ARGS", "CLOUDFLARE_", "CF_")
+        )
+        and key not in {"TF_REATTACH_PROVIDERS", "TF_WORKSPACE"}
     }
     configuration = temporary / "empty.tfrc"
     configuration.write_text("", encoding="utf-8")
@@ -55,7 +58,7 @@ def isolated_environment(temporary):
 
 
 def validate_roots(stage, roots, temporary):
-    """Run only fmt, backend-disabled init, and validate for each confined root."""
+    """Run format/schema checks and mocked plan-only tests in disposable copies."""
     environment = isolated_environment(temporary)
     for index, relative in enumerate(roots):
         environment["TF_DATA_DIR"] = str(temporary / f"terraform-data-{index}")
@@ -70,12 +73,13 @@ def validate_roots(stage, roots, temporary):
             ["terraform", "fmt", "-check", "-recursive"],
             ["terraform", "init", "-backend=false", "-input=false", "-no-color"],
             ["terraform", "validate", "-no-color"],
+            ["terraform", "test", "-test-directory=tests/terraform", "-no-color"],
         ):
             subprocess.run(command, cwd=directory, env=environment, check=True)
 
 
 def main():
-    """Validate disposable source without accessing a backend or running a plan."""
+    """Validate disposable source with synthetic mocked plans and no backend."""
     root = Path(__file__).resolve().parents[1]
     policy = json.loads((root / ".release-policy.json").read_text())
     if not shutil.which("terraform"):
@@ -86,7 +90,7 @@ def main():
         stage_sources(root, stage)
         validate_roots(stage, policy["terraform_roots"], Path(temporary))
     print(
-        "Terraform format/schema passed; no plan, apply, backend, state or live-resource checks."
+        "Terraform format/schema and mocked plan tests passed; no apply, backend, operator state or live resources."
     )
 
 

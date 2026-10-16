@@ -43,6 +43,12 @@ variable "team_name" {
 variable "allow_emails" {
   description = "Emails allowed by the browser Allow policy"
   type        = list(string)
+  validation {
+    condition = length(var.allow_emails) > 0 && alltrue([
+      for email in var.allow_emails : can(regex("^[^@*[:space:]]+@[^@*[:space:]]+\\.[^@*[:space:]]+$", email))
+    ])
+    error_message = "Provide at least one explicit email address; wildcards and empty allowlists are not supported."
+  }
 }
 
 variable "allow_policy_name" {

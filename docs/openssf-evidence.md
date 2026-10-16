@@ -53,3 +53,7 @@ Do not equate a green metadata or release job with successful application tests.
 - Link only this project's real awarded badge once the assessment is accepted.
 
 The live assessment, when created, is the source of truth for the badge level. Unverified criteria remain open.
+
+## Current source qualification
+
+See [the strict TLS profile](TLS_PROFILE.md), [FLOSS OpenTofu route](OPENTOFU.md), [source changes](../CHANGELOG.md), [governance](../GOVERNANCE.md), and [roadmap](roadmap.md). Actual mocked policy plans test Access bindings, explicit allowlists, JWT enforcement and private output. Full-source coverage and backup-maintainer recovery remain unestablished.

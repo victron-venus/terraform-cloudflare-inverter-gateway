@@ -1,5 +1,7 @@
 # terraform-cloudflare-inverter-gateway
 
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/15581/badge)](https://www.bestpractices.dev/projects/15581)
+
 Terraform for Cloudflare **Zero Trust Access** in front of [`inverter-gateway`](https://github.com/victron-venus/inverter-gateway) behind Cloudflare Tunnel.
 
 Manages:
@@ -103,3 +105,11 @@ GitHub repository is created under [`victron-venus`](https://github.com/victron-
 See [CONTRIBUTING.md](CONTRIBUTING.md) for reports, development checks and pull requests,
 [SECURITY.md](SECURITY.md) for private vulnerability reporting and deployment trust boundaries,
 and the [OpenSSF evidence index](docs/openssf-evidence.md) for assessment references and remaining verification.
+
+## Development and security evidence
+
+Run `bash scripts/ci.sh` for syntax/schema validation and isolated mock policy tests.
+The [OpenTofu route](docs/OPENTOFU.md) supports FLOSS development, and the
+[strict TLS profile](docs/TLS_PROFILE.md) specifies verified engine/provider settings.
+See [source changes](CHANGELOG.md), [governance](GOVERNANCE.md),
+[conduct](CODE_OF_CONDUCT.md) and the [roadmap](docs/roadmap.md).
