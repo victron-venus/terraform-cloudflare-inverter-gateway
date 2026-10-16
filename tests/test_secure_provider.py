@@ -1,8 +1,11 @@
 """Security boundaries of the opt-in provider build, without network access."""
 
+import contextlib
 import importlib.util
 import io
 import os
+import shutil
+import subprocess
 import sys
 import tarfile
 import tempfile
@@ -19,6 +22,52 @@ SPEC.loader.exec_module(MODULE)
 
 
 class SecureProviderBuildTests(unittest.TestCase):
+    def test_real_go_filter_preserves_account_and_access_unit_tests(self):
+        go = shutil.which("go")
+        if not go:
+            self.skipTest("Go is required for the actual provider test-filter regression")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "go.mod").write_text("module filterfixture\n\ngo 1.23\n")
+            fixture = [
+                'package filterfixture',
+                'import ("os"; "testing")',
+            ]
+            names = ["TestAccount", "TestAccess", "TestAccidental"]
+            for name in names:
+                fixture.append(
+                    f'func {name}(t *testing.T) {{ '
+                    f'if err := os.WriteFile("{name}", []byte("ran"), 0600); '
+                    'err != nil { t.Fatal(err) } }'
+                )
+            for name in ["TestAcc", "TestAccCloudflare", "TestAcc_Basic"]:
+                fixture.append(f'func {name}(t *testing.T) {{ t.Fatal("acceptance selected") }}')
+            (root / "filter_test.go").write_text("\n".join(fixture) + "\n")
+            environment = {
+                **os.environ, "GOWORK": "off", "GOENV": "off",
+                "GOTOOLCHAIN": "local", "CGO_ENABLED": "0", "GOMAXPROCS": "2",
+            }
+            result = subprocess.run(
+                MODULE.unit_test_command(go), cwd=root, env=environment,
+                capture_output=True, text=True, timeout=60, check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            for name in names:
+                self.assertEqual((root / name).read_text(), "ran")
+
+    def test_stage_output_is_retained_and_failure_still_propagates(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                with self.assertRaises(subprocess.CalledProcessError):
+                    MODULE.run(
+                        [sys.executable, "-c", "print('fixture diagnostic'); raise SystemExit(7)"],
+                        root, dict(os.environ), root / "stage.log", timeout=5,
+                    )
+            self.assertEqual((root / "stage.log").read_text(), "fixture diagnostic\n")
+            self.assertIn("fixture diagnostic", output.getvalue())
+
     def test_timeout_stops_child_even_if_driver_exits_on_term(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

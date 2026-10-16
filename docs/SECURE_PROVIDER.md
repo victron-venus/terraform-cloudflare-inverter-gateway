@@ -37,10 +37,23 @@ source and verified Go modules, runs `govulncheck`, runs upstream non-acceptance
 unit tests, then builds and inspects the executable. It rejects archive links and
 path traversal, removes inherited cloud credentials and compiler settings, and
 records logs, dependency files, the upstream license and `provenance.json`.
-Acceptance tests requiring a real Cloudflare account are excluded. No Terraform
-command, provider installation, infrastructure change, or state access occurs.
-Each build stage has a one-hour timeout. An interrupted or timed-out stage stops
-its entire compiler process group and cannot produce completed provenance.
+The upstream suite runs with `-short` and excludes only names matching
+`^TestAcc($|[A-Z_])`; names such as `TestAccount...` and `TestAccess...` remain
+included. Existing upstream skips remain in effect, so this is not acceptance
+qualification and does not claim every declared test executes. All packages and
+production source remain present. Test binaries omit debug symbols to reduce
+linking work; their assertions and package initialization remain unchanged.
+No Terraform command, provider installation, infrastructure change, or state
+access occurs.
+
+The test stage has a 70-minute limit; other build stages have a one-hour limit.
+CI has a 90-minute total budget and retains logs even if a stage fails. Package
+completion output is also streamed during the run. An interrupted or timed-out
+stage stops its entire compiler process group and cannot produce completed
+provenance. Two concurrent Go package workers and `GOMAXPROCS=2` bound the load;
+the [public Ubuntu runner](https://docs.github.com/en/actions/reference/runners/github-hosted-runners#standard-github-hosted-runners-for-public-repositories) has four CPUs and 16 GB of memory. The longer test
+budget follows an observed 58-minute timeout during test compilation, not a
+claim that the previous run passed.
 
 The source scan is a call-graph analysis, not a claim that every behavior is
 tested. A nonzero scanner result or unit-test failure prevents a completed

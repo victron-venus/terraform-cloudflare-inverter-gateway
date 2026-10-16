@@ -20,7 +20,7 @@ The helper clears ambient credentials/options, uses an empty CLI configuration
 and temporary HOME, and excludes state, private tfvars and symlinks from its source
 copy. The tests mock both providers and never apply, access a backend, or manage a
 live resource. Provider downloads still require network access. The current suite
-contains 28 Python tests and four mocked plan tests; Linux CI repeats the complete
+contains 30 Python tests and four mocked plan tests; Linux CI repeats the complete
 route. The strict TLS regression also passed all 8 cases using the actual Linux
 ARM64 OpenTofu binary and unchanged Cloudflare provider.
 

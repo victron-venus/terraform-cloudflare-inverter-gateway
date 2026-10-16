@@ -11,6 +11,7 @@ import ssl
 import subprocess
 import tarfile
 import tempfile
+import time
 import urllib.request
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -120,6 +121,14 @@ def stop_group(process):
     process.wait()
 
 
+def unit_test_command(go):
+    """Keep Account/Access unit tests; only the distinct TestAcc prefix is excluded."""
+    return [
+        go, "test", "-p", "2", "-short", "-count=1", "-ldflags=-s -w",
+        "-skip", "^TestAcc($|[A-Z_])", "./...",
+    ]
+
+
 def run(command, source, environment, log, timeout=3600):
     """Retain the complete result and stop on a failed qualification stage."""
     print("Running:", " ".join(map(str, command)), flush=True)
@@ -132,8 +141,20 @@ def run(command, source, environment, log, timeout=3600):
             stderr=subprocess.STDOUT,
             start_new_session=True,
         )
+        deadline = time.monotonic() + timeout
         try:
-            result = process.wait(timeout=timeout)
+            with log.open(encoding="utf-8", errors="replace") as progress:
+                while True:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        raise subprocess.TimeoutExpired(command, timeout)
+                    try:
+                        result = process.wait(timeout=min(10, remaining))
+                    except subprocess.TimeoutExpired:
+                        print(progress.read(), end="", flush=True)
+                        continue
+                    print(progress.read(), end="", flush=True)
+                    break
         except subprocess.TimeoutExpired:
             stop_group(process)
             raise SystemExit(f"Build stage exceeded {timeout} seconds; see {log}") from None
@@ -212,10 +233,11 @@ def main():
             output / "source-vulnerabilities.log",
         )
         run(
-            [go, "test", "-p", "2", "-short", "-skip", "^TestAcc", "./..."],
+            unit_test_command(go),
             source,
             environment,
             output / "unit-tests.log",
+            timeout=70 * 60,
         )
         binary = output / manifest["binary_name"]
         platform_os, platform_arch = args.platform.split("_")
@@ -261,7 +283,7 @@ def main():
             "platform": args.platform,
             "actual_go_version": actual,
             "binary_sha256": digest(binary),
-            "qualification": "source scan and non-acceptance unit tests passed; transport calibration still required",
+            "qualification": "source scan and upstream short non-acceptance test command passed (upstream skips retained); transport calibration still required",
         }
         (output / "provenance.json").write_text(json.dumps(provenance, indent=2) + "\n")
     print(
