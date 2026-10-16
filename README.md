@@ -113,3 +113,7 @@ The [OpenTofu route](docs/OPENTOFU.md) supports FLOSS development, and the
 [strict TLS profile](docs/TLS_PROFILE.md) specifies verified engine/provider settings.
 See [source changes](CHANGELOG.md), [governance](GOVERNANCE.md),
 [conduct](CODE_OF_CONDUCT.md) and the [roadmap](docs/roadmap.md).
+
+The optional [disclosed provider security patch](docs/SECURE_PROVIDER.md) provides
+a pinned source build and qualification path while official provider binaries
+retain the runtime findings documented in the dependency review.

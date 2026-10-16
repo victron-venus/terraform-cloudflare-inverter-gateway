@@ -24,6 +24,7 @@ class TerraformIsolationTests(unittest.TestCase):
             "CLOUDFLARE_API_TOKEN": "private",
             "CF_API_KEY": "private",
             "TF_WORKSPACE": "production",
+            "TF_DISABLE_PLUGIN_TLS": "1",
         }
         with (
             tempfile.TemporaryDirectory() as directory,

@@ -26,7 +26,7 @@ jobs:
           python3 -m pip install --require-hashes --only-binary=:all: -r .github/requirements-workflow-contracts.txt
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e
         with:
-          terraform_version: 1.16.5
+          terraform_version: 1.16.6
           terraform_wrapper: false
       - name: Install checksum-verified actionlint
         run: |
@@ -70,3 +70,14 @@ jobs:
           unzip "$tofu_dir/tofu.zip" -d "$tofu_dir"
           TOFU_BIN="$tofu_dir/tofu" python3 scripts/check_opentofu.py
           TLS_TEST_TERRAFORM="$tofu_dir/tofu" TLS_TEST_PROVIDER_DIR="$RUNNER_TEMP/tls-provider" TLS_TEST_PLATFORM=linux_amd64 "$RUNNER_TEMP/tls-test-venv/bin/python" scripts/test_tls_profile.py
+      - name: Install pinned compiler for the disclosed provider patch
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.27.2'
+          cache: false
+      - name: Build and qualify the disclosed provider security patch
+        run: |
+          patched="$RUNNER_TEMP/cloudflare-patched"
+          python3 scripts/build_secure_provider.py --go "$(command -v go)" --platform linux_amd64 --output "$patched"
+          TLS_TEST_TERRAFORM="$(command -v terraform)" TLS_TEST_PROVIDER_DIR="$patched" TLS_TEST_PLATFORM=linux_amd64 "$RUNNER_TEMP/tls-test-venv/bin/python" scripts/test_tls_profile.py
+          TLS_TEST_TERRAFORM="$RUNNER_TEMP/opentofu-1.13.1/tofu" TLS_TEST_PROVIDER_DIR="$patched" TLS_TEST_PLATFORM=linux_amd64 "$RUNNER_TEMP/tls-test-venv/bin/python" scripts/test_tls_profile.py

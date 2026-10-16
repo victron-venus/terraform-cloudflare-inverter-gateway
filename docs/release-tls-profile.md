@@ -75,3 +75,19 @@ Source references:
   and [verified-chain enforcement](https://github.com/golang/go/blob/go1.27.1/src/crypto/tls/common.go).
 - [OpenSSF Passing criteria](https://www.bestpractices.dev/en/criteria/0), particularly
   `crypto_keylength` and `crypto_pfs`.
+
+## Dated dependency scope — 2026-10-16
+
+The reviewed helper commands create outbound clients; they do not expose a
+GitHub CLI server, load extensions, use custom hosts, or invoke arbitrary CLI
+aliases. The binary has advisory matches; it is not described as vulnerability
+free. The critical [GO-2026-6612](https://pkg.go.dev/vuln/GO-2026-6612) requires an
+HTTP/2 server, which these API/status paths do not start. The older
+[GO-2026-5932](https://pkg.go.dev/vuln/GO-2026-5932) names legacy OpenPGP packages;
+those packages are absent from the upstream `cmd/gh` dependency graph.
+
+The remaining noncritical matches were published on 2026-10-08. Reassess and
+qualify a corrected runtime before 2026-12-07, and after any helper/runtime scope
+change. Passing's time threshold does not mean those issues have been fixed.
+See the exact [shared outbound client](https://github.com/cli/cli/blob/fc4b137cdef0a6bd28fd461b7cf9c84a5812a8cd/api/http_client.go)
+and [API command](https://github.com/cli/cli/blob/fc4b137cdef0a6bd28fd461b7cf9c84a5812a8cd/pkg/cmd/api/api.go).

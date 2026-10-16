@@ -1,6 +1,6 @@
 # FLOSS development and validation
 
-Official OpenTofu **1.13.1** (MPL-2.0), the Cloudflare5.24.0/local2.9.0 providers,
+Official OpenTofu **1.13.1** (MPL-2.0), the Cloudflare 5.24.0/local 2.9.0 providers,
 Python, Git and actionlint provide a tested FLOSS source-development route:
 
 ```sh
@@ -19,11 +19,11 @@ HashiCorp's local-provider lock entry to its own registry while preserving versi
 The helper clears ambient credentials/options, uses an empty CLI configuration
 and temporary HOME, and excludes state, private tfvars and symlinks from its source
 copy. The tests mock both providers and never apply, access a backend, or manage a
-live resource. Provider downloads still require network access. The October2026
-Darwin ARM64 run passed all14 Python tests and all4 mock plans; Linux CI repeats
-this route. The strict TLS regression also passed all8 cases using the actual
+live resource. Provider downloads still require network access. The October 2026
+Darwin ARM64 run passed all 14 Python tests and all 4 mock plans; Linux CI repeats
+this route. The strict TLS regression also passed all 8 cases using the actual
 Linux ARM64 OpenTofu binary and unchanged Cloudflare provider.
 
 This is a supported source-validation route, not a production-state migration.
-The ordinary Terraform1.16.5 workflow remains supported. A real engine/state
+The ordinary Terraform 1.16.6 workflow remains supported. A real engine/state
 migration requires an independent compatibility and recovery review.

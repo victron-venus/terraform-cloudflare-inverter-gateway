@@ -42,7 +42,7 @@ def isolated_environment(temporary):
         if not key.startswith(
             ("TF_VAR_", "TF_TOKEN_", "TF_CLI_ARGS", "CLOUDFLARE_", "CF_")
         )
-        and key not in {"TF_REATTACH_PROVIDERS", "TF_WORKSPACE"}
+        and key not in {"TF_REATTACH_PROVIDERS", "TF_WORKSPACE", "TF_DISABLE_PLUGIN_TLS"}
     }
     configuration = temporary / "empty.tfrc"
     configuration.write_text("", encoding="utf-8")
@@ -83,7 +83,7 @@ def main():
     root = Path(__file__).resolve().parents[1]
     policy = json.loads((root / ".release-policy.json").read_text())
     if not shutil.which("terraform"):
-        raise SystemExit("Install Terraform 1.16.5 before running scripts/ci.sh")
+        raise SystemExit("Install Terraform 1.16.6 before running scripts/ci.sh")
     with tempfile.TemporaryDirectory(prefix="terraform-ci-") as temporary:
         stage = Path(temporary) / "source"
         stage.mkdir()
