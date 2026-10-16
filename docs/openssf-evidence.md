@@ -57,3 +57,5 @@ The live assessment, when created, is the source of truth for the badge level. U
 ## Current source qualification
 
 See [the strict TLS profile](TLS_PROFILE.md), [FLOSS OpenTofu route](OPENTOFU.md), [source changes](../CHANGELOG.md), [governance](../GOVERNANCE.md), and [roadmap](roadmap.md). Actual mocked policy plans test Access bindings, explicit allowlists, JWT enforcement and private output. Full-source coverage and backup-maintainer recovery remain unestablished.
+
+The [dependency security review](dependency-security.md) records binary vulnerability findings that are absent from GitHub dependency alerts. Remediation criteria remain open; transport calibration is not a substitute.

@@ -1,5 +1,9 @@
 # Complete local-execution TLS profile
 
+The [dependency security review](dependency-security.md) records unresolved
+official-tool vulnerability findings. Successful key-length calibration does not
+remediate them or establish Passing readiness.
+
 The maintained module delegates network operations to Terraform/OpenTofu and the
 Cloudflare provider; it does not implement cryptographic primitives. The verified
 profile uses official Terraform **1.16.5** (Go **1.26.8**) or OpenTofu **1.13.1**

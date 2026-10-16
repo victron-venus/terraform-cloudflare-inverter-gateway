@@ -20,7 +20,7 @@ explicit list of addresses. This source change does not migrate or apply state.
 
 Mock plans and TLS fixtures use synthetic data only. Strict TLS is a documented
 opt-in execution profile and may reject old endpoint certificates. Protect state
-and generated credential files. No known vulnerability identifier is assigned.
+and generated credential files. No new application vulnerability identifier is assigned. The dependency review records unresolved official-tool binary advisories; this change does not claim they are fixed.
 
 ## Previous source baseline — 2026-10-16
 
