@@ -48,8 +48,8 @@ def install_local_provider(root, archive, mirror, platform):
         lock,
         re.DOTALL,
     )
-    if not section or not re.search(r'version\s*=\s*"2\.9\.0"', section.group(1)):
-        raise ValueError("Expected locked local provider 2.9.0")
+    if not section or not re.search(r'version\s*=\s*"2\.9\.1"', section.group(1)):
+        raise ValueError("Expected locked local provider 2.9.1")
     digest = hashlib.sha256(archive.read_bytes()).hexdigest()
     if '"zh:' + digest + '"' not in section.group(1):
         raise ValueError("Local-provider archive does not match the original lock")
@@ -57,12 +57,12 @@ def install_local_provider(root, archive, mirror, platform):
         names = [
             n
             for n in bundle.namelist()
-            if n.startswith("terraform-provider-local_v2.9.0") and "/" not in n
+            if n.startswith("terraform-provider-local_v2.9.1") and "/" not in n
         ]
         if len(names) != 1:
             raise ValueError("Expected one local-provider executable")
         target = (
-            mirror / "registry.terraform.io/hashicorp/local/2.9.0" / platform / names[0]
+            mirror / "registry.terraform.io/hashicorp/local/2.9.1" / platform / names[0]
         )
         target.parent.mkdir(parents=True)
         target.write_bytes(bundle.read(names[0]))

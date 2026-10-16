@@ -77,16 +77,16 @@ Run the wrapper from the reviewed original checkout for every command:
 ```sh
 python3 scripts/run_secure_profile.py --tofu /VERIFIED/tofu \
   --provider-dir /PRIVATE/cloudflare-provider --platform linux_arm64 \
-  --local-provider-archive /VERIFIED/terraform-provider-local_2.9.0_linux_arm64.zip \
+  --local-provider-archive /VERIFIED/terraform-provider-local_2.9.1_linux_arm64.zip \
   --directory /NEW/PRIVATE/WORKSPACE init
 python3 scripts/run_secure_profile.py --tofu /VERIFIED/tofu \
   --provider-dir /PRIVATE/cloudflare-provider --platform linux_arm64 \
-  --local-provider-archive /VERIFIED/terraform-provider-local_2.9.0_linux_arm64.zip \
+  --local-provider-archive /VERIFIED/terraform-provider-local_2.9.1_linux_arm64.zip \
   --directory /NEW/PRIVATE/WORKSPACE plan -var-file=local.secrets.tfvars -out=reviewed.tfplan
 # Only after reviewing the exact plan and approving its intended changes:
 python3 scripts/run_secure_profile.py --tofu /VERIFIED/tofu \
   --provider-dir /PRIVATE/cloudflare-provider --platform linux_arm64 \
-  --local-provider-archive /VERIFIED/terraform-provider-local_2.9.0_linux_arm64.zip \
+  --local-provider-archive /VERIFIED/terraform-provider-local_2.9.1_linux_arm64.zip \
   --directory /NEW/PRIVATE/WORKSPACE apply reviewed.tfplan
 ```
 
@@ -113,7 +113,7 @@ schema and all four mocked plan tests using verified OpenTofu 1.13.1:
 python3 scripts/check_secure_provider.py \
   --engine /absolute/path/to/tofu \
   --provider-dir /absolute/path/to/new-provider-build \
-  --local-provider-archive /absolute/path/to/terraform-provider-local_2.9.0_linux_amd64.zip \
+  --local-provider-archive /absolute/path/to/terraform-provider-local_2.9.1_linux_amd64.zip \
   --platform linux_amd64
 ```
 

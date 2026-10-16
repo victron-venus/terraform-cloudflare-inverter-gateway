@@ -9,6 +9,10 @@
   output behavior using four isolated mock plans. Reject empty/wildcard allowlists.
 - Add a verified strict TLS profile and a FLOSS OpenTofu validation route.
 - Document ownership, confidential conduct reporting and the current recovery gap.
+- Update the official local provider to 2.9.1 and provide a disclosed Cloudflare
+  provider build with Go 1.27.2 and updated security dependencies.
+- Add a verified local-state execution wrapper that pins the engine and provider,
+  excludes remote backends and preserves private IPC/state permissions.
 
 ### Upgrade
 
@@ -20,7 +24,10 @@ explicit list of addresses. This source change does not migrate or apply state.
 
 Mock plans and TLS fixtures use synthetic data only. Strict TLS is a documented
 opt-in execution profile and may reject old endpoint certificates. Protect state
-and generated credential files. No new application vulnerability identifier is assigned. The dependency review records unresolved official-tool binary advisories; this change does not claim they are fixed.
+and generated credential files. No new application vulnerability identifier is assigned. The dependency review distinguishes older official Cloudflare binaries from the
+disclosed provider build and the bounded engine/local-provider profiles. Recent
+engine advisories remain tracked; no claim covers arbitrary engine features or
+an existing deployment that has not selected the verified profile.
 
 ## Previous source baseline — 2026-10-16
 

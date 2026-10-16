@@ -61,13 +61,13 @@ class SecureProviderValidationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             archive = root / "local.zip"
-            name = "terraform-provider-local_v2.9.0_x5"
+            name = "terraform-provider-local_v2.9.1_x5"
             with zipfile.ZipFile(archive, "w") as bundle:
                 bundle.writestr(name, b"synthetic executable")
                 bundle.writestr("../outside", b"ignored")
             digest = hashlib.sha256(archive.read_bytes()).hexdigest()
             (root / ".terraform.lock.hcl").write_text(
-                'provider "registry.terraform.io/hashicorp/local" {\n version = "2.9.0"\n hashes = ["zh:'
+                'provider "registry.terraform.io/hashicorp/local" {\n version = "2.9.1"\n hashes = ["zh:'
                 + digest
                 + '"]\n}\n'
             )
@@ -75,7 +75,7 @@ class SecureProviderValidationTests(unittest.TestCase):
             MODULE.install_local_provider(root, archive, mirror, "linux_arm64")
             target = (
                 mirror
-                / "registry.terraform.io/hashicorp/local/2.9.0/linux_arm64"
+                / "registry.terraform.io/hashicorp/local/2.9.1/linux_arm64"
                 / name
             )
             self.assertEqual(target.read_bytes(), b"synthetic executable")

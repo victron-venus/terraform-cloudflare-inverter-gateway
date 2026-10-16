@@ -87,6 +87,7 @@ def clean_environment(root, go):
         "TMPDIR": str(root / "tmp"),
         "GOTOOLCHAIN": "local",
         "GOENV": "off",
+        "GOWORK": "off",
         "GOPROXY": "https://proxy.golang.org",
         "GOSUMDB": "sum.golang.org",
         "GOPATH": str(root / "gopath"),
