@@ -46,14 +46,33 @@ linking work; their assertions and package initialization remain unchanged.
 No Terraform command, provider installation, infrastructure change, or state
 access occurs.
 
-The test stage has a 70-minute limit; other build stages have a one-hour limit.
-CI has a 90-minute total budget and retains logs even if a stage fails. Package
+The standalone test stage has a 70-minute limit; other build stages have a
+one-hour limit. CI divides the complete `go list ./...` package inventory into
+eight disjoint, deterministic partitions on independent Ubuntu workers. It does
+not remove test files, acceptance helpers, package initialization, packages
+without test files, or any unit-test assertions. Every partition uses the same
+`-short`, `-count=1` and acceptance-name filter described above. A shard writes
+only its logs and a success receipt; it cannot emit a production binary or claim
+that the entire suite passed.
+
+Each CI job has a 90-minute budget and retains logs even if a stage fails. The
+final required validation job rejects any failed, skipped or cancelled matrix.
+Before its full production build, it independently enumerates the exact patched
+source again and checks all eight receipt indices, the exact non-overlapping
+union, per-package Go result lines, and retained log hashes. Receipts must match
+the checkout commit, source archive and module hashes, compiler, native/target
+platforms, test command and qualification script hashes. Missing, duplicated,
+altered or stale evidence fails the job. The production build and all existing
+Terraform/OpenTofu transport, mocked-plan and actual-wrapper checks follow only
+after this reconciliation. These internal CI options do not change the default
+standalone command above, which still executes the entire suite itself.
+
+Package
 completion output is also streamed during the run. An interrupted or timed-out
 stage stops its entire compiler process group and cannot produce completed
 provenance. Two concurrent Go package workers and `GOMAXPROCS=2` bound the load;
-the [public Ubuntu runner](https://docs.github.com/en/actions/reference/runners/github-hosted-runners#standard-github-hosted-runners-for-public-repositories) has four CPUs and 16 GB of memory. The longer test
-budget follows an observed 58-minute timeout during test compilation, not a
-claim that the previous run passed.
+the [public Ubuntu runner](https://docs.github.com/en/actions/reference/runners/github-hosted-runners-for-public-repositories) has four CPUs and 16 GB of memory. Partitioning addresses measured compilation/linking cost;
+it does not treat an earlier timeout or partial package list as a passing suite.
 
 The source scan is a call-graph analysis, not a claim that every behavior is
 tested. A nonzero scanner result or unit-test failure prevents a completed

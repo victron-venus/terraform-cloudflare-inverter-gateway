@@ -14,6 +14,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+sys.path.insert(0, str(Path(__file__).parents[1] / "scripts"))
 SPEC = importlib.util.spec_from_file_location(
     "secure_provider", Path(__file__).parents[1] / "scripts/build_secure_provider.py"
 )
