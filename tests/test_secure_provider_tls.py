@@ -146,8 +146,9 @@ class StrictTlsTests(unittest.TestCase):
             client, server = self.contexts(d, None, ssl.TLSVersion.TLSv1_3)
             with self.assertRaises(ssl.SSLCertVerificationError):
                 handshake(client, server, hostname="wrong.test")
+            untrusted_client = MODULE.source_context()
             with self.assertRaises(ssl.SSLCertVerificationError):
-                handshake(MODULE.source_context(), server)
+                handshake(untrusted_client, server)
 
     def test_stronger_platform_policy_is_preserved(self):
         context = ssl.create_default_context()
@@ -195,10 +196,9 @@ class StrictTlsTests(unittest.TestCase):
         ):
             with self.subTest(url=url), self.assertRaises(ValueError):
                 MODULE.validate_source_url(url)
+            redirect_handler = MODULE.HTTPSOnlyRedirect()
             with self.subTest(redirect=url), self.assertRaises(ValueError):
-                MODULE.HTTPSOnlyRedirect().redirect_request(
-                    None, None, 302, "redirect", {}, url
-                )
+                redirect_handler.redirect_request(None, None, 302, "redirect", {}, url)
         MODULE.validate_source_url("https://github.com/source")
         MODULE.validate_source_url("https://codeload.github.com/source")
 

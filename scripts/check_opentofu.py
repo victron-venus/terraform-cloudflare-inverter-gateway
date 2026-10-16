@@ -23,6 +23,34 @@ def adapt_source(name, text):
     return text
 
 
+def stage_source(root, stage):
+    """Copy only public source and apply explicit compatibility translations."""
+    names = (
+        subprocess.check_output(
+            ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
+            cwd=root,
+        )
+        .decode()
+        .split("\0")
+    )
+    for name in set(names):
+        source = root / name
+        if not name or not source.is_file() or source.is_symlink():
+            continue
+        if ".terraform" in source.parts or ".tfstate" in source.name:
+            continue
+        if name.endswith((".tfvars", ".tfvars.json")):
+            continue
+        target = stage / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            text = source.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            shutil.copyfile(source, target)
+        else:
+            target.write_text(adapt_source(name, text), encoding="utf-8")
+
+
 def main():
     """Run the existing complete source/policy gate using a verified FLOSS tool."""
     root = Path(__file__).resolve().parents[1]
@@ -62,30 +90,7 @@ def main():
         metadata = json.loads(version.stdout)
         if metadata.get("terraform_version") != "1.13.1":
             raise SystemExit("This compatibility profile requires OpenTofu 1.13.1")
-        names = (
-            subprocess.check_output(
-                ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
-                cwd=root,
-            )
-            .decode()
-            .split("\0")
-        )
-        for name in set(names):
-            source = root / name
-            if not name or not source.is_file() or source.is_symlink():
-                continue
-            if ".terraform" in source.parts or ".tfstate" in source.name:
-                continue
-            if name.endswith((".tfvars", ".tfvars.json")):
-                continue
-            target = stage / name
-            target.parent.mkdir(parents=True, exist_ok=True)
-            try:
-                text = source.read_text(encoding="utf-8")
-            except UnicodeDecodeError:
-                shutil.copyfile(source, target)
-            else:
-                target.write_text(adapt_source(name, text), encoding="utf-8")
+        stage_source(root, stage)
         # Removing Terraform-only attributes changes alignment in copied HCL.
         subprocess.run(
             [binary, "fmt", "-recursive"], cwd=stage, env=environment, check=True

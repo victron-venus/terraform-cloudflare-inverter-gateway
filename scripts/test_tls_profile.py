@@ -93,6 +93,7 @@ def run(bits, strict, mode):
 
         srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
         ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        ctx.minimum_version = ssl.TLSVersion.TLSv1_2
         ctx.set_ciphers("DEFAULT:@SECLEVEL=0")
         ctx.load_cert_chain(p / "ca.pem", p / "key.pem")
         srv.socket = ctx.wrap_socket(srv.socket, server_side=True)
@@ -142,6 +143,7 @@ def run(bits, strict, mode):
             capture_output=True,
             text=True,
             timeout=60,
+            check=False,
         )
         plan = None
         if not ini.returncode:
@@ -152,25 +154,25 @@ def run(bits, strict, mode):
                 capture_output=True,
                 text=True,
                 timeout=60,
+                check=False,
             )
         srv.shutdown()
         thread.join()
         rejected = strict and bits < 2048
         if rejected:
             result = ini if mode == "module" else plan
-            assert result is not None and result.returncode != 0, (
-                "Weak key was not rejected"
-            )
+            assert result is not None, "No weak-key result"
+            assert result.returncode != 0, "Weak key was not rejected"
             assert "no FIPS compatible certificate chains" in result.stderr, (
                 result.stderr
             )
             assert not requests, "Application bytes reached weak peer"
         else:
             assert ini.returncode == 0, ini.stderr
-            assert plan is not None and plan.returncode == 0, (
-                plan.stderr if plan else "No plan"
-            )
-            assert requests and any(
+            assert plan is not None, "No plan"
+            assert plan.returncode == 0, plan.stderr
+            assert requests, "No application request"
+            assert any(
                 auth == "Bearer synthetic-test-token-00000000000000000000"
                 for _, auth in requests
             )

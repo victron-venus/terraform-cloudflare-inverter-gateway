@@ -91,3 +91,30 @@ publisher-signed registry artifact. Never use an unrelated shared override file.
 Normal review and deployment acceptance remain required before any real apply.
 Requalify compiler/dependency updates, and prefer an equivalent fixed official
 provider once it is available and has passed the same checks.
+
+## Validate this repository with the derivative
+
+After a completed build, verify the derivative against this repository's actual
+schema and all four mocked plan tests using verified OpenTofu 1.13.1:
+
+```sh
+python3 scripts/check_secure_provider.py \
+  --engine /absolute/path/to/tofu \
+  --provider-dir /absolute/path/to/new-provider-build \
+  --local-provider-archive /absolute/path/to/terraform-provider-local_2.9.0_linux_amd64.zip \
+  --platform linux_amd64
+```
+
+The helper verifies derivative provenance and binary digest, checks the official
+local-provider archive against the existing repository lock, then builds a
+filesystem-only mirror in a disposable directory. Only that copy's provider
+locks change. OpenTofu's unsupported `override_during` syntax is removed while
+preserving all policy assertions. It runs format/init/validate/test with the
+strict TLS environment, without credentials, backend initialization, live API
+calls or apply. The original files and state are untouched.
+
+These build and validation helpers are local operator tools. Their explicit
+`--go`, `--engine`, `--provider-dir` and `--output` filesystem arguments are under
+the caller's authority; there is no HTTP endpoint, chatbot/LLM tool integration
+or service accepting untrusted path requests. Do not expose them through such an
+interface without a separate authorization and path-confinement design.

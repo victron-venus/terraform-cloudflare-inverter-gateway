@@ -81,3 +81,4 @@ jobs:
           python3 scripts/build_secure_provider.py --go "$(command -v go)" --platform linux_amd64 --output "$patched"
           TLS_TEST_TERRAFORM="$(command -v terraform)" TLS_TEST_PROVIDER_DIR="$patched" TLS_TEST_PLATFORM=linux_amd64 "$RUNNER_TEMP/tls-test-venv/bin/python" scripts/test_tls_profile.py
           TLS_TEST_TERRAFORM="$RUNNER_TEMP/opentofu-1.13.1/tofu" TLS_TEST_PROVIDER_DIR="$patched" TLS_TEST_PLATFORM=linux_amd64 "$RUNNER_TEMP/tls-test-venv/bin/python" scripts/test_tls_profile.py
+          python3 scripts/check_secure_provider.py --engine "$RUNNER_TEMP/opentofu-1.13.1/tofu" --provider-dir "$patched" --platform linux_amd64 --local-provider-archive "$RUNNER_TEMP/tls-provider-mirror/registry.terraform.io/hashicorp/local/terraform-provider-local_2.9.0_linux_amd64.zip"

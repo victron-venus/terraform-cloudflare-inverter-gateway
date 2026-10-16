@@ -46,3 +46,33 @@ verified HTTPS endpoints and private credentials/state, and do not treat the
 [strict TLS profile](TLS_PROFILE.md) as a complete vulnerability assessment.
 CI still enforces the source checks, policy tests, static configuration analysis
 and real transport calibration introduced by this change.
+
+## Qualified engine scope
+
+A completed `go list -deps .` audit of exact Terraform 1.16.6 source
+[7b8f1669b95119ac6021e05c9d10eae7cf75f60b](https://github.com/hashicorp/terraform/tree/7b8f1669b95119ac6021e05c9d10eae7cf75f60b)
+contains 1,778 packages. The legacy `golang.org/x/crypto/openpgp` package affected
+by [GO-2026-5932](https://pkg.go.dev/vuln/GO-2026-5932) is absent: provider and
+release signature verification use maintained ProtonMail OpenPGP. The binary's
+other twelve records were published October 8. The sole critical record,
+[GO-2026-6612](https://pkg.go.dev/vuln/GO-2026-6612), requires an HTTP/2 server
+processing attacker streams. The qualified local-backend init/validate/plan
+profile uses outbound HTTPS and private provider RPC with AutoMTLS; no public
+HTTP/2 server is exposed. Do not set `TF_DISABLE_PLUGIN_TLS`, invoke login or use
+unreviewed remote backends/custom providers as part of this assessment.
+
+The remaining recent noncritical findings stay tracked; reassess before
+December 7, 2026, or immediately for a new critical finding or profile/version
+change. This scoped assessment found no applicable critical or 60-day-old
+medium/higher engine vulnerability on October 16; it does not assert the official
+binary is advisory-free or qualify the old Cloudflare provider. Resolving the
+source dependency graph using Go 1.27.2 did not rebuild or upgrade the official
+Terraform binary, whose runtime remains Go 1.26.8.
+
+OpenTofu 1.13.1 is a separately tested FLOSS compatibility profile, with
+1,808 command dependencies: no legacy OpenPGP or affected sumdb client/tlog;
+only independent sumdb/dirhash is imported. Its additional gRPC advisory
+[GO-2026-6443](https://pkg.go.dev/vuln/GO-2026-6443) is noncritical and was
+published September 15. Reassess that record before November 14, 2026.
+The same local-backend/AutoMTLS boundary applies; arbitrary engine features
+are outside this evidence.
