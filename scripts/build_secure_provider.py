@@ -178,8 +178,8 @@ def run(command, source, environment, log, timeout=3600):
             raise subprocess.CalledProcessError(result, command)
 
 
-def main():
-    """Build and qualify a pinned, explicitly labelled derivative provider."""
+def parse_arguments():
+    """Validate explicit standalone, shard, or complete-receipt modes."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--go", required=True, type=Path, help="Verified Go 1.27.2 executable"
@@ -219,6 +219,67 @@ def main():
         )
     if not sharded and (args.test_shards != 1 or args.qualification_id is not None):
         parser.error("Shard metadata requires a shard or complete receipt directory")
+    return args
+
+
+def qualify_tests(go, source, environment, output, args, manifest, actual):
+    """Run the full suite, emit one shard receipt, or verify the full receipt set."""
+    unit_log = output / "unit-tests.log"
+    if args.test_shard is None and args.test_receipts is None:
+        run(unit_test_command(go), source, environment, unit_log, timeout=70 * 60)
+        return {}
+    run([go, "list", "./..."], source, environment, output / "packages.log")
+    packages = checked_inventory(
+        sorted((output / "packages.log").read_text().splitlines())
+    )
+    native = subprocess.check_output(
+        [str(go), "env", "GOOS", "GOARCH"],
+        cwd=source,
+        env=environment,
+        text=True,
+        timeout=30,
+    ).splitlines()
+    context = {
+        "qualification_id": args.qualification_id,
+        "manifest": manifest,
+        "actual_go_version": actual,
+        "test_platform": "_".join(native),
+        "target_platform": args.platform,
+        "scripts": {
+            name: digest(Path(__file__).with_name(name))
+            for name in ("build_secure_provider.py", "provider_test_shards.py")
+        },
+        "test_command": [str(item) for item in unit_test_command("go", ["<packages>"])],
+    }
+    if args.test_shard is not None:
+        selected = partition(packages, args.test_shard, args.test_shards)
+        run(
+            unit_test_command(go, selected),
+            source,
+            environment,
+            unit_log,
+            timeout=70 * 60,
+        )
+        for name, expected in manifest["module_files"].items():
+            if digest(source / name) != expected:
+                raise SystemExit(
+                    f"Tests unexpectedly changed pinned dependencies: {name}"
+                )
+        write_receipt(
+            output, context, packages, args.test_shard, args.test_shards, unit_log
+        )
+        print(
+            f"Passed shard {args.test_shard + 1}/{args.test_shards}; no production binary or full qualification emitted."
+        )
+        return {}
+    summary = reconcile(args.test_receipts, context, packages, args.test_shards)
+    (output / "unit-shards.json").write_text(json.dumps(summary, indent=2) + "\n")
+    return {"unit_test_shards": summary, "qualification_id": args.qualification_id}
+
+
+def main():
+    """Build and qualify a pinned, explicitly labelled derivative provider."""
+    args = parse_arguments()
     go = args.go.resolve(strict=True)
     output = args.output.resolve()
     if output.exists():
@@ -274,73 +335,11 @@ def main():
             environment,
             output / "source-vulnerabilities.log",
         )
-        test_summary = None
-        if sharded:
-            run([go, "list", "./..."], source, environment, output / "packages.log")
-            packages = checked_inventory(
-                sorted((output / "packages.log").read_text().splitlines())
-            )
-            native = subprocess.check_output(
-                [str(go), "env", "GOOS", "GOARCH"],
-                cwd=source,
-                env=environment,
-                text=True,
-                timeout=30,
-            ).splitlines()
-            context = {
-                "qualification_id": args.qualification_id,
-                "manifest": manifest,
-                "actual_go_version": actual,
-                "test_platform": "_".join(native),
-                "target_platform": args.platform,
-                "scripts": {
-                    name: digest(Path(__file__).with_name(name))
-                    for name in ("build_secure_provider.py", "provider_test_shards.py")
-                },
-                "test_command": [
-                    str(item) for item in unit_test_command("go", ["<packages>"])
-                ],
-            }
-            if args.test_shard is not None:
-                selected = partition(packages, args.test_shard, args.test_shards)
-                run(
-                    unit_test_command(go, selected),
-                    source,
-                    environment,
-                    output / "unit-tests.log",
-                    timeout=70 * 60,
-                )
-                for name, expected in manifest["module_files"].items():
-                    if digest(source / name) != expected:
-                        raise SystemExit(
-                            f"Tests unexpectedly changed pinned dependencies: {name}"
-                        )
-                write_receipt(
-                    output,
-                    context,
-                    packages,
-                    args.test_shard,
-                    args.test_shards,
-                    output / "unit-tests.log",
-                )
-                print(
-                    f"Passed shard {args.test_shard + 1}/{args.test_shards}; no production binary or full qualification emitted."
-                )
-                return
-            test_summary = reconcile(
-                args.test_receipts, context, packages, args.test_shards
-            )
-            (output / "unit-shards.json").write_text(
-                json.dumps(test_summary, indent=2) + "\n"
-            )
-        else:
-            run(
-                unit_test_command(go),
-                source,
-                environment,
-                output / "unit-tests.log",
-                timeout=70 * 60,
-            )
+        test_evidence = qualify_tests(
+            go, source, environment, output, args, manifest, actual
+        )
+        if args.test_shard is not None:
+            return
         binary = output / manifest["binary_name"]
         platform_os, platform_arch = args.platform.split("_")
         target_environment = {
@@ -387,9 +386,7 @@ def main():
             "binary_sha256": digest(binary),
             "qualification": "source scan and upstream short non-acceptance test command passed (upstream skips retained); transport calibration still required",
         }
-        if test_summary is not None:
-            provenance["unit_test_shards"] = test_summary
-            provenance["qualification_id"] = args.qualification_id
+        provenance.update(test_evidence)
         (output / "provenance.json").write_text(json.dumps(provenance, indent=2) + "\n")
     print(
         f"Built disclosed derivative in {output}; not installed. Run the real TLS tests before use."
