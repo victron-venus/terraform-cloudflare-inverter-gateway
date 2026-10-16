@@ -23,7 +23,7 @@ jobs:
           python-version: '3.12'
       - name: Install pinned syntax parser
         run: |
-          python3 -m pip install --require-hashes --only-binary=:all: -r .github/requirements-workflow-contracts.txt
+          python3 -m pip install --require-hashes --only-binary=:all: -r .github/requirements-workflow-contracts.txt -r requirements-security-tests.txt
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e
         with:
           terraform_version: 1.16.6
@@ -50,7 +50,7 @@ jobs:
           TLS_TEST_PLATFORM: linux_amd64
         run: |
           python3 -m venv "$RUNNER_TEMP/tls-test-venv"
-          "$RUNNER_TEMP/tls-test-venv/bin/pip" install cryptography==50.0.2 cffi==2.1.1 pycparser==3.0
+          "$RUNNER_TEMP/tls-test-venv/bin/pip" install --require-hashes --only-binary=:all: -r requirements-security-tests.txt
           mirror="$RUNNER_TEMP/tls-provider-mirror"
           terraform providers mirror -platform=linux_amd64 "$mirror"
           provider_dir="$RUNNER_TEMP/tls-provider"

@@ -32,3 +32,14 @@ Install Terraform 1.16.5. Checks copy the current tracked/non-ignored source int
 
 - Validation-only policy: no synthetic beta/RC artifacts or tag-triggered stable releases.
 - Terraform format/schema validation and plan-only mock-provider policy tests use disposable source copies; no apply, remote-state or live-resource checks.
+
+Before local checks, install the pinned synthetic TLS test dependencies in a
+virtual environment:
+
+```sh
+python3 -m pip install --require-hashes --only-binary=:all: -r requirements-security-tests.txt
+```
+
+The source-download regression uses only synthetic certificate chains and
+MemoryBIO; it verifies trusted strong TLS1.2/1.3 handshakes, weak keys at each
+chain position, hostname/trust failures and HTTPS redirect restrictions.

@@ -68,6 +68,7 @@ class SecureProviderBuildTests(unittest.TestCase):
             )
         self.assertFalse(set(private) & set(environment))
         self.assertEqual(environment["GOTOOLCHAIN"], "local")
+        self.assertEqual(environment["GODEBUG"], "fips140=on")
         self.assertEqual(environment["GOENV"], "off")
         self.assertEqual(environment["GOSUMDB"], "sum.golang.org")
         self.assertEqual(environment["PATH"].split(os.pathsep)[0], "/verified/bin")

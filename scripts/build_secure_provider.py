@@ -6,16 +6,65 @@ import hashlib
 import json
 import os
 import shutil
+import ssl
 import subprocess
 import tarfile
 import tempfile
 import urllib.request
 from pathlib import Path
+from urllib.parse import urlsplit
 
 
 def digest(path):
     """Return the integrity digest for a local artifact."""
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def source_context():
+    """Require a verified TLS chain with the strict OpenSSL 3 key policy."""
+    if ssl.OPENSSL_VERSION_INFO[0] < 3:
+        raise RuntimeError("Source downloads require OpenSSL 3 or newer")
+    context = ssl.create_default_context()
+    context.minimum_version = max(context.minimum_version, ssl.TLSVersion.TLSv1_2)
+    level = max(3, context.security_level)
+    ciphers = ":".join(
+        item["name"] for item in context.get_ciphers() if item["protocol"] != "TLSv1.3"
+    )
+    context.set_ciphers(f"{ciphers}:@SECLEVEL={level}")
+    if context.security_level < 3:
+        raise RuntimeError("Unable to enforce the strict certificate key policy")
+    return context
+
+
+def validate_source_url(url):
+    """Keep the unauthenticated pinned archive request on verified GitHub HTTPS."""
+    parsed = urlsplit(url)
+    if (
+        parsed.scheme != "https"
+        or parsed.hostname not in {"github.com", "codeload.github.com"}
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.port not in {None, 443}
+    ):
+        raise ValueError("Source downloads and redirects must use GitHub HTTPS")
+
+
+class HTTPSOnlyRedirect(urllib.request.HTTPRedirectHandler):
+    """Reject downgrade and off-origin redirects before a new request is sent."""
+
+    def redirect_request(self, request, fp, code, msg, headers, newurl):
+        validate_source_url(newurl)
+        return super().redirect_request(request, fp, code, msg, headers, newurl)
+
+
+def download_source(url, destination):
+    """Use the same strict policy for the original request and every redirect."""
+    validate_source_url(url)
+    opener = urllib.request.build_opener(
+        urllib.request.HTTPSHandler(context=source_context()), HTTPSOnlyRedirect()
+    )
+    with opener.open(url, timeout=60) as response:
+        destination.write_bytes(response.read())
 
 
 def extract_source(archive, destination):
@@ -46,6 +95,7 @@ def clean_environment(root, go):
         "CGO_ENABLED": "0",
         "GOTELEMETRY": "off",
         "GOMAXPROCS": "2",
+        "GODEBUG": "fips140=on",
     }
 
 
@@ -102,8 +152,7 @@ def main():
             )
         output.mkdir(parents=True)
         archive = temporary / "source.tar.gz"
-        with urllib.request.urlopen(manifest["source_url"], timeout=60) as response:
-            archive.write_bytes(response.read())
+        download_source(manifest["source_url"], archive)
         if digest(archive) != manifest["source_sha256"]:
             raise SystemExit("Upstream source checksum mismatch")
         extract_source(archive, temporary)

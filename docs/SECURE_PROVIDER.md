@@ -15,7 +15,14 @@ No provider resource implementation is patched. The internal version string is
 
 ## Build and qualify
 
-Install an official Go 1.27.2 archive after checking its publisher SHA-256. Pass
+Install an official Go 1.27.2 archive after checking its publisher SHA-256.
+The Python source downloader requires OpenSSL 3 and applies security level 3
+(with any stronger existing policy preserved), hostname/trust verification and
+TLS 1.2 or newer. This rejects RSA keys below 3072 bits throughout the chain;
+GitHub's ECDSA chain is supported. Only HTTPS redirects between github.com and
+codeload.github.com are accepted. The verified Go subprocesses use
+`GODEBUG=fips140=on`, including module and scanner downloads. Custom trust stores
+or proxies need separate qualification. Pass
 the actual executable, not an assumption about `GOTOOLCHAIN` selection:
 
 ```sh
