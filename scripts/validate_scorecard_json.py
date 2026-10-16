@@ -31,10 +31,36 @@ CHECKS = frozenset(
         "Maintained",
     }
 )
-# Preserve the pinned upstream action policy: these checks are not reported.
-DISABLED = frozenset({"Contributors", "Signed-Releases"})
-VERSION = {"version": "v5.5.0", "commit": "c395761df6afe1a69e476bc60a013a94bcbc153f"}
-PACKAGING_ABSENT = "packaging workflow not detected"
+VERSION = {"version": "v5.6.0", "commit": "61e84743356275f6ffca23b1b2f2cb945e19eb96"}
+# JSON2 contains every check, including checks excluded by the SARIF policy.
+# Only these exact normal results in pinned checks/evaluation/{packaging,
+# signed_releases}.go may lack a score; runtime-error results remain failures.
+NOT_APPLICABLE = {
+    "Packaging": "packaging workflow not detected",
+    "Signed-Releases": "no releases found",
+}
+
+
+def validate_check_score(check: dict, name: str) -> None:
+    """Reject runtime failures while preserving the pinned not-applicable result."""
+    score = check.get("score")
+    # JSON2 omits CheckResult.Error, but preserves the exact reason and score.
+    if (
+        name in NOT_APPLICABLE
+        and isinstance(score, int)
+        and score == -1
+        and check.get("reason") == NOT_APPLICABLE[name]
+        and check.get("error") is None
+    ):
+        return
+    # In pinned v5.6.0 every runtime-error constructor sets score=-1.
+    if (
+        not isinstance(score, int)
+        or isinstance(score, bool)
+        or not 0 <= score <= 10
+        or check.get("error") is not None
+    ):
+        raise ValueError(f"Incomplete Scorecard check: {name}")
 
 
 def validate(result: object, repository: str, commit: str) -> None:
@@ -60,26 +86,7 @@ def validate(result: object, repository: str, commit: str) -> None:
         if not isinstance(name, str) or name not in CHECKS or name in seen:
             raise ValueError("Unexpected or duplicate Scorecard check")
         seen.add(name)
-        score = check.get("score")
-        # Pinned evaluation/packaging.go emits this normal not-applicable result;
-        # checks/packaging.go wraps runtime failures as prefixed internal errors.
-        # JSON2 omits Error, but preserves the exact reason and score.
-        if (
-            name == "Packaging"
-            and isinstance(score, int)
-            and score == -1
-            and check.get("reason") == PACKAGING_ABSENT
-            and check.get("error") is None
-        ):
-            continue
-        # In pinned v5.5.0 every runtime-error constructor sets score=-1;
-        # JSON2 retains that score even though it omits CheckResult.Error.
-        if name not in DISABLED and (
-            not isinstance(score, int)
-            or isinstance(score, bool)
-            or not 0 <= score <= 10
-        ):
-            raise ValueError(f"Incomplete Scorecard check: {name}")
+        validate_check_score(check, name)
     if seen != CHECKS:
         raise ValueError("Scorecard did not run every expected check")
 

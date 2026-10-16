@@ -1,0 +1,16 @@
+{
+  "source_url": "https://github.com/cloudflare/terraform-provider-cloudflare/archive/4f360d592a7d968c684a9b212c26808534b7c0d3.tar.gz",
+  "source_commit": "4f360d592a7d968c684a9b212c26808534b7c0d3",
+  "source_sha256": "e04e1b7c9cafcf89c748b41df8b856b7bf9565c5605e3c930db1a71ebf5ab842",
+  "source_root": "terraform-provider-cloudflare-4f360d592a7d968c684a9b212c26808534b7c0d3",
+  "provider_address": "registry.terraform.io/cloudflare/cloudflare",
+  "upstream_version": "5.24.0",
+  "build_version": "5.24.0-openssf.1",
+  "binary_name": "terraform-provider-cloudflare_v5.24.0",
+  "go_version": "go1.27.2",
+  "govulncheck_version": "v1.9.0",
+  "module_files": {
+    "go.mod": "2bd1ca82dfc2bd56c831c5ba7840a5b5638918e7d8be6440fd8944b69fd96f01",
+    "go.sum": "e9d1997ffd5abe3467530e85abf86bcd1a9d6d70bb04637123f2b7705e9733a1"
+  }
+}

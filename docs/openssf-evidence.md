@@ -45,7 +45,7 @@ Do not equate a green metadata or release job with successful application tests.
 ## Items requiring explicit verification before submission
 
 - Confirm the private reporting channel works and examine issue/advisory history. Historical response-time claims require actual reports and responses, including any reports outside GitHub.
-- Obtain primary-developer attestations about secure-design and vulnerability-prevention knowledge; repository text cannot establish a person's knowledge.
+- The primary maintainer confirmed secure-design and vulnerability-prevention knowledge and no outside bug, enhancement or vulnerability reports during the preceding 12 months. These are human attestations; public issue/advisory history is checked separately.
 - Verify every user-facing release has useful release notes and upgrade impact, and includes any assigned vulnerability identifiers for fixes.
 - Review dependency, code-scanning and secret-scanning findings and their age. A workflow success result is not proof that all findings are resolved.
 - Review the actual cryptographic libraries, protocols, key lengths, randomness, certificate checks and password storage applicable to this project. Do not copy another project's answers.
@@ -53,3 +53,9 @@ Do not equate a green metadata or release job with successful application tests.
 - Link only this project's real awarded badge once the assessment is accepted.
 
 The live assessment, when created, is the source of truth for the badge level. Unverified criteria remain open.
+
+## Current source qualification
+
+See [the strict TLS profile](TLS_PROFILE.md), [FLOSS OpenTofu route](OPENTOFU.md), [source changes](../CHANGELOG.md), [governance](../GOVERNANCE.md), and [roadmap](roadmap.md). Actual mocked policy plans test Access bindings, explicit allowlists, JWT enforcement and private output. Full-source coverage and backup-maintainer recovery remain unestablished.
+
+The [dependency security review](dependency-security.md) records binary vulnerability findings that are absent from GitHub dependency alerts. The [disclosed provider build and execution profile](SECURE_PROVIDER.md) must pass source scanning, upstream unit tests, repository policy tests and actual TLS calibration before qualification. Transport calibration alone is not a substitute.

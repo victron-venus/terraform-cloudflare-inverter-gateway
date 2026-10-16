@@ -5,11 +5,67 @@ name: Local validation
 permissions:
   contents: read
 jobs:
+  provider_unit_tests:
+    name: Provider unit tests / shard ${{ matrix.shard }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 110
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version: '1.27.2'
+          cache: false
+      - name: Test exact provider package partition
+        env:
+          SHARD_INDEX: ${{ matrix.shard }}
+          QUALIFICATION_ID: ${{ github.sha }}
+        run: |
+          python3 scripts/build_secure_provider.py --go "$(command -v go)" --platform linux_amd64 --output "$RUNNER_TEMP/provider-shard" --test-shard "$SHARD_INDEX" --test-shards 16 --qualification-id "$QUALIFICATION_ID"
+      - name: Preserve uniquely named diagnostics
+        if: ${{ always() }}
+        env:
+          SHARD_INDEX: ${{ matrix.shard }}
+        run: |
+          directory="$RUNNER_TEMP/provider-shard"
+          for log in "$directory"/*.log; do
+            if [ -f "$log" ]; then
+              cp "$log" "$directory/shard-$SHARD_INDEX-$(basename "$log")"
+            fi
+          done
+      - name: Retain partition receipt and diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: provider-unit-receipt-${{ matrix.shard }}
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/provider-shard/shard-*.json
+            ${{ runner.temp }}/provider-shard/shard-*.log
   validate:
+    needs: provider_unit_tests
+    if: ${{ always() }}
     name: Repository validation
     runs-on: ${{ fromJSON((vars.CI_RUNNER_MODE == 'self-hosted' || vars.CI_RUNNER_MODE == 'k3s') && ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || (contains(fromJSON('["push","schedule","workflow_dispatch"]'), github.event_name) && github.ref == format('refs/heads/{0}', github.event.repository.default_branch))) && (vars.CI_RUNNER_LABELS || '[]') || '["ubuntu-latest"]') }}
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
+      - name: Require every provider test shard to succeed
+        env:
+          UNIT_RESULT: ${{ needs.provider_unit_tests.result }}
+        run: test "$UNIT_RESULT" = success
       - name: Harden the runner (Audit all outbound calls)
         uses: step-security/harden-runner@ccd8616d44fd3846e67624a50d5aad6d37bf2d25 # v2.22.1
         with:
@@ -23,10 +79,10 @@ jobs:
           python-version: '3.12'
       - name: Install pinned syntax parser
         run: |
-          python3 -m pip install --require-hashes --only-binary=:all: -r .github/requirements-workflow-contracts.txt
+          python3 -m pip install --require-hashes --only-binary=:all: -r .github/requirements-workflow-contracts.txt -r requirements-security-tests.txt
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e
         with:
-          terraform_version: 1.16.5
+          terraform_version: 1.16.6
           terraform_wrapper: false
       - name: Install checksum-verified actionlint
         run: |
@@ -37,3 +93,72 @@ jobs:
           printf '%s\n' "$RUNNER_TEMP" >> "$GITHUB_PATH"
       - name: Run local checks
         run: bash scripts/ci.sh
+      - name: Analyze Terraform configuration security
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          version: v0.74.0
+          scan-type: config
+          scan-ref: .
+          exit-code: '1'
+          severity: HIGH,CRITICAL
+      - name: Verify real Terraform and provider TLS boundaries
+        env:
+          TLS_TEST_PLATFORM: linux_amd64
+        run: |
+          python3 -m venv "$RUNNER_TEMP/tls-test-venv"
+          "$RUNNER_TEMP/tls-test-venv/bin/pip" install --require-hashes --only-binary=:all: -r requirements-security-tests.txt
+          mirror="$RUNNER_TEMP/tls-provider-mirror"
+          terraform providers mirror -platform=linux_amd64 "$mirror"
+          provider_dir="$RUNNER_TEMP/tls-provider"
+          mkdir -p "$provider_dir"
+          unzip "$mirror/registry.terraform.io/cloudflare/cloudflare/terraform-provider-cloudflare_5.24.0_linux_amd64.zip" -d "$provider_dir"
+          TLS_TEST_TERRAFORM="$(command -v terraform)"
+          export TLS_TEST_TERRAFORM
+          export TLS_TEST_PROVIDER_DIR="$provider_dir"
+          go version -m "$TLS_TEST_TERRAFORM"
+          go version -m "$provider_dir/terraform-provider-cloudflare_v5.24.0"
+          "$RUNNER_TEMP/tls-test-venv/bin/python" scripts/test_tls_profile.py
+      - name: Validate the FLOSS OpenTofu compatibility profile
+        run: |
+          tofu_dir="$RUNNER_TEMP/opentofu-1.13.1"
+          mkdir -p "$tofu_dir"
+          curl --proto '=https' --proto-redir '=https' --fail --silent --show-error --location https://github.com/opentofu/opentofu/releases/download/v1.13.1/tofu_1.13.1_linux_amd64.zip -o "$tofu_dir/tofu.zip"
+          printf '%s  %s\n' '8ccbc6f8ee21d2827715f3c6e08a9b3e0209b1e62057c05067ef117e047c1a80' "$tofu_dir/tofu.zip" | sha256sum --check --strict
+          unzip "$tofu_dir/tofu.zip" -d "$tofu_dir"
+          TOFU_BIN="$tofu_dir/tofu" python3 scripts/check_opentofu.py
+          TLS_TEST_TERRAFORM="$tofu_dir/tofu" TLS_TEST_PROVIDER_DIR="$RUNNER_TEMP/tls-provider" TLS_TEST_PLATFORM=linux_amd64 "$RUNNER_TEMP/tls-test-venv/bin/python" scripts/test_tls_profile.py
+      - name: Install pinned compiler for the disclosed provider patch
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.27.2'
+          cache: false
+      - name: Download current-run provider test receipts
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: provider-unit-receipt-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/provider-unit-receipts
+      - name: Build and qualify the disclosed provider security patch
+        env:
+          QUALIFICATION_ID: ${{ github.sha }}
+        run: |
+          patched="$RUNNER_TEMP/cloudflare-patched"
+          python3 scripts/build_secure_provider.py --go "$(command -v go)" --platform linux_amd64 --output "$patched" --test-receipts "$RUNNER_TEMP/provider-unit-receipts" --test-shards 16 --qualification-id "$QUALIFICATION_ID"
+          TLS_TEST_TERRAFORM="$(command -v terraform)" TLS_TEST_PROVIDER_DIR="$patched" TLS_TEST_PLATFORM=linux_amd64 "$RUNNER_TEMP/tls-test-venv/bin/python" scripts/test_tls_profile.py
+          TLS_TEST_TERRAFORM="$RUNNER_TEMP/opentofu-1.13.1/tofu" TLS_TEST_PROVIDER_DIR="$patched" TLS_TEST_PLATFORM=linux_amd64 "$RUNNER_TEMP/tls-test-venv/bin/python" scripts/test_tls_profile.py
+          python3 scripts/check_secure_provider.py --engine "$RUNNER_TEMP/opentofu-1.13.1/tofu" --provider-dir "$patched" --platform linux_amd64 --local-provider-archive "$RUNNER_TEMP/tls-provider-mirror/registry.terraform.io/hashicorp/local/terraform-provider-local_2.9.1_linux_amd64.zip"
+          TLS_TEST_PROFILE_ROOT="$PWD" TLS_TEST_LOCAL_ARCHIVE="$RUNNER_TEMP/tls-provider-mirror/registry.terraform.io/hashicorp/local/terraform-provider-local_2.9.1_linux_amd64.zip" TLS_TEST_TERRAFORM="$RUNNER_TEMP/opentofu-1.13.1/tofu" TLS_TEST_PROVIDER_DIR="$patched" TLS_TEST_PLATFORM=linux_amd64 "$RUNNER_TEMP/tls-test-venv/bin/python" scripts/test_tls_profile.py
+      - name: Retain provider qualification evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: cloudflare-provider-qualification
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/cloudflare-patched/*.log
+            ${{ runner.temp }}/cloudflare-patched/provenance.json
+            ${{ runner.temp }}/cloudflare-patched/unit-shards.json
+            ${{ runner.temp }}/cloudflare-patched/go.mod
+            ${{ runner.temp }}/cloudflare-patched/go.sum
+            ${{ runner.temp }}/cloudflare-patched/UPSTREAM-LICENSE

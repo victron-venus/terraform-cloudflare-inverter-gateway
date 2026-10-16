@@ -1,0 +1,397 @@
+#!/usr/bin/env python3
+"""Build a disclosed provider patch; never install it, mutate locks or run Terraform."""
+
+import argparse
+import hashlib
+import json
+import os
+import re
+import signal
+import shutil
+import ssl
+import subprocess
+import tarfile
+import tempfile
+import time
+import urllib.request
+from pathlib import Path
+from urllib.parse import urlsplit
+
+from provider_test_shards import checked_inventory, partition, reconcile, write_receipt
+
+
+def digest(path):
+    """Return the integrity digest for a local artifact."""
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def source_context():
+    """Require a verified TLS chain with the strict OpenSSL 3 key policy."""
+    if ssl.OPENSSL_VERSION_INFO[0] < 3:
+        raise RuntimeError("Source downloads require OpenSSL 3 or newer")
+    context = ssl.create_default_context()
+    context.minimum_version = max(context.minimum_version, ssl.TLSVersion.TLSv1_2)
+    level = max(3, context.security_level)
+    ciphers = ":".join(
+        item["name"] for item in context.get_ciphers() if item["protocol"] != "TLSv1.3"
+    )
+    context.set_ciphers(f"{ciphers}:@SECLEVEL={level}")
+    if context.security_level < 3:
+        raise RuntimeError("Unable to enforce the strict certificate key policy")
+    return context
+
+
+def validate_source_url(url):
+    """Keep the unauthenticated pinned archive request on verified GitHub HTTPS."""
+    parsed = urlsplit(url)
+    if (
+        parsed.scheme != "https"
+        or parsed.hostname not in {"github.com", "codeload.github.com"}
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.port not in {None, 443}
+    ):
+        raise ValueError("Source downloads and redirects must use GitHub HTTPS")
+
+
+class HTTPSOnlyRedirect(urllib.request.HTTPRedirectHandler):
+    """Reject downgrade and off-origin redirects before a new request is sent."""
+
+    def redirect_request(self, request, fp, code, msg, headers, newurl):
+        validate_source_url(newurl)
+        return super().redirect_request(request, fp, code, msg, headers, newurl)
+
+
+def download_source(url, destination):
+    """Use the same strict policy for the original request and every redirect."""
+    validate_source_url(url)
+    opener = urllib.request.build_opener(
+        urllib.request.HTTPSHandler(context=source_context()), HTTPSOnlyRedirect()
+    )
+    with opener.open(url, timeout=60) as response:
+        destination.write_bytes(response.read())
+
+
+def extract_source(archive, destination):
+    """Accept only regular files/directories below the extraction root."""
+    with tarfile.open(archive, "r:gz") as bundle:
+        for member in bundle.getmembers():
+            target = (destination / member.name).resolve()
+            if not target.is_relative_to(destination.resolve()):
+                raise ValueError("Source archive escapes extraction root")
+            if not (member.isfile() or member.isdir()):
+                raise ValueError("Source archive contains links or special files")
+        bundle.extractall(destination, filter="data")
+
+
+def clean_environment(root, go):
+    """Exclude cloud credentials, operator Go configuration and Terraform options."""
+    return {
+        "PATH": str(go.parent) + os.pathsep + os.environ.get("PATH", ""),
+        "HOME": str(root),
+        "TMPDIR": str(root / "tmp"),
+        "GOTOOLCHAIN": "local",
+        "GOENV": "off",
+        "GOWORK": "off",
+        "GOPROXY": "https://proxy.golang.org",
+        "GOSUMDB": "sum.golang.org",
+        "GOPATH": str(root / "gopath"),
+        "GOCACHE": str(root / "cache"),
+        "GOBIN": str(root / "bin"),
+        "CGO_ENABLED": "0",
+        "GOTELEMETRY": "off",
+        "GOMAXPROCS": "2",
+        "GODEBUG": "fips140=on",
+    }
+
+
+def stop_group(process):
+    """Terminate the compiler and its children, not only the Go driver."""
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        process.wait()
+        return
+    try:
+        process.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        pass
+    # The driver may exit before a child that ignored SIGTERM. Finish the group.
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    process.wait()
+
+
+def unit_test_command(go, packages=None):
+    """Keep Account/Access unit tests; only the distinct TestAcc prefix is excluded."""
+    return [
+        go,
+        "test",
+        "-p",
+        "2",
+        "-short",
+        "-count=1",
+        "-ldflags=-s -w",
+        "-skip",
+        "^TestAcc($|[A-Z_])",
+        *(packages if packages is not None else ["./..."]),
+    ]
+
+
+def run(command, source, environment, log, timeout=3600):
+    """Retain the complete result and stop on a failed qualification stage."""
+    print("Running:", " ".join(map(str, command)), flush=True)
+    with log.open("w", encoding="utf-8") as stream:
+        process = subprocess.Popen(
+            list(map(str, command)),
+            cwd=source,
+            env=environment,
+            stdout=stream,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+        )
+        deadline = time.monotonic() + timeout
+        try:
+            with log.open(encoding="utf-8", errors="replace") as progress:
+                while True:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        raise subprocess.TimeoutExpired(command, timeout)
+                    try:
+                        result = process.wait(timeout=min(10, remaining))
+                    except subprocess.TimeoutExpired:
+                        print(progress.read(), end="", flush=True)
+                        continue
+                    print(progress.read(), end="", flush=True)
+                    break
+        except subprocess.TimeoutExpired:
+            stop_group(process)
+            raise SystemExit(
+                f"Build stage exceeded {timeout} seconds; see {log}"
+            ) from None
+        except BaseException:
+            stop_group(process)
+            raise
+        if result:
+            raise subprocess.CalledProcessError(result, command)
+
+
+def parse_arguments():
+    """Validate explicit standalone, shard, or complete-receipt modes."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--go", required=True, type=Path, help="Verified Go 1.27.2 executable"
+    )
+    parser.add_argument(
+        "--output", required=True, type=Path, help="New artifact directory"
+    )
+    parser.add_argument(
+        "--platform",
+        choices=("linux_amd64", "linux_arm64", "darwin_amd64", "darwin_arm64"),
+        required=True,
+    )
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
+        "--test-shard",
+        type=int,
+        help="Run only this zero-based unit shard; emit no binary",
+    )
+    mode.add_argument(
+        "--test-receipts",
+        type=Path,
+        help="Require complete successful shard receipts before building",
+    )
+    parser.add_argument("--test-shards", type=int, default=1)
+    parser.add_argument(
+        "--qualification-id",
+        help="Exact CI checkout commit shared by all qualification jobs",
+    )
+    args = parser.parse_args()
+    sharded = args.test_shard is not None or args.test_receipts is not None
+    if sharded and (
+        args.test_shards < 2
+        or not re.fullmatch(r"[0-9a-f]{40}", args.qualification_id or "")
+    ):
+        parser.error(
+            "Sharded qualification requires at least two shards and an exact checkout commit"
+        )
+    if not sharded and (args.test_shards != 1 or args.qualification_id is not None):
+        parser.error("Shard metadata requires a shard or complete receipt directory")
+    return args
+
+
+def qualify_tests(go, source, environment, output, args, manifest, actual):
+    """Run the full suite, emit one shard receipt, or verify the full receipt set."""
+    unit_log = output / "unit-tests.log"
+    if args.test_shard is None and args.test_receipts is None:
+        run(unit_test_command(go), source, environment, unit_log, timeout=12 * 60 * 60)
+        return {}
+    run([go, "list", "./..."], source, environment, output / "packages.log")
+    packages = checked_inventory(
+        sorted((output / "packages.log").read_text().splitlines())
+    )
+    native = subprocess.check_output(
+        [str(go), "env", "GOOS", "GOARCH"],
+        cwd=source,
+        env=environment,
+        text=True,
+        timeout=30,
+    ).splitlines()
+    context = {
+        "qualification_id": args.qualification_id,
+        "manifest": manifest,
+        "actual_go_version": actual,
+        "test_platform": "_".join(native),
+        "target_platform": args.platform,
+        "scripts": {
+            name: digest(Path(__file__).with_name(name))
+            for name in ("build_secure_provider.py", "provider_test_shards.py")
+        },
+        "test_command": [str(item) for item in unit_test_command("go", ["<packages>"])],
+    }
+    if args.test_shard is not None:
+        selected = partition(packages, args.test_shard, args.test_shards)
+        run(
+            unit_test_command(go, selected),
+            source,
+            environment,
+            unit_log,
+            timeout=90 * 60,
+        )
+        for name, expected in manifest["module_files"].items():
+            if digest(source / name) != expected:
+                raise SystemExit(
+                    f"Tests unexpectedly changed pinned dependencies: {name}"
+                )
+        write_receipt(
+            output, context, packages, args.test_shard, args.test_shards, unit_log
+        )
+        print(
+            f"Passed shard {args.test_shard + 1}/{args.test_shards}; no production binary or full qualification emitted."
+        )
+        return {}
+    summary = reconcile(args.test_receipts, context, packages, args.test_shards)
+    (output / "unit-shards.json").write_text(json.dumps(summary, indent=2) + "\n")
+    return {"unit_test_shards": summary, "qualification_id": args.qualification_id}
+
+
+def main():
+    """Build and qualify a pinned, explicitly labelled derivative provider."""
+    args = parse_arguments()
+    go = args.go.resolve(strict=True)
+    output = args.output.resolve()
+    if output.exists():
+        raise SystemExit(
+            "Output must be a new directory; existing artifacts are never overwritten"
+        )
+    pinned = Path(__file__).resolve().parents[1] / "security/provider"
+    manifest = json.loads((pinned / "manifest.json").read_text())
+    for name, expected in manifest["module_files"].items():
+        if digest(pinned / name) != expected:
+            raise SystemExit(f"Pinned module-file checksum mismatch: {name}")
+    with tempfile.TemporaryDirectory(prefix="secure-provider-") as temporary:
+        temporary = Path(temporary)
+        (temporary / "tmp").mkdir()
+        environment = clean_environment(temporary, go)
+        actual = subprocess.check_output(
+            [str(go), "env", "GOVERSION"],
+            cwd=temporary,
+            env=environment,
+            text=True,
+            timeout=30,
+        ).strip()
+        if actual != manifest["go_version"]:
+            raise SystemExit(
+                f"Expected {manifest['go_version']}, found {actual}; do not infer compiler version from GOTOOLCHAIN"
+            )
+        output.mkdir(parents=True)
+        archive = temporary / "source.tar.gz"
+        download_source(manifest["source_url"], archive)
+        if digest(archive) != manifest["source_sha256"]:
+            raise SystemExit("Upstream source checksum mismatch")
+        extract_source(archive, temporary)
+        source = temporary / manifest["source_root"]
+        for name in manifest["module_files"]:
+            shutil.copyfile(pinned / name, source / name)
+            shutil.copyfile(pinned / name, output / name)
+        shutil.copyfile(source / "LICENSE", output / "UPSTREAM-LICENSE")
+        run([go, "mod", "download"], source, environment, output / "download.log")
+        run([go, "mod", "verify"], source, environment, output / "modules.log")
+        run(
+            [
+                go,
+                "install",
+                "golang.org/x/vuln/cmd/govulncheck@" + manifest["govulncheck_version"],
+            ],
+            source,
+            environment,
+            output / "scanner-install.log",
+        )
+        run(
+            [temporary / "bin/govulncheck", "-show", "traces", "."],
+            source,
+            environment,
+            output / "source-vulnerabilities.log",
+        )
+        test_evidence = qualify_tests(
+            go, source, environment, output, args, manifest, actual
+        )
+        if args.test_shard is not None:
+            return
+        binary = output / manifest["binary_name"]
+        platform_os, platform_arch = args.platform.split("_")
+        target_environment = {
+            **environment,
+            "GOOS": platform_os,
+            "GOARCH": platform_arch,
+        }
+        run(
+            [
+                go,
+                "build",
+                "-p",
+                "2",
+                "-mod=readonly",
+                "-trimpath",
+                "-buildvcs=false",
+                "-ldflags=-s -w -X main.version=" + manifest["build_version"],
+                "-o",
+                binary,
+                ".",
+            ],
+            source,
+            target_environment,
+            output / "build.log",
+        )
+        run(
+            [go, "version", "-m", binary],
+            source,
+            environment,
+            output / "binary-metadata.log",
+        )
+        metadata = (output / "binary-metadata.log").read_text()
+        if manifest["go_version"] not in metadata.splitlines()[0]:
+            raise SystemExit("Built executable does not report the qualified compiler")
+        for name, expected in manifest["module_files"].items():
+            if digest(source / name) != expected:
+                raise SystemExit(
+                    f"Build unexpectedly changed pinned dependencies: {name}"
+                )
+        provenance = {
+            **manifest,
+            "platform": args.platform,
+            "actual_go_version": actual,
+            "binary_sha256": digest(binary),
+            "qualification": "source scan and upstream short non-acceptance test command passed (upstream skips retained); transport calibration still required",
+        }
+        provenance.update(test_evidence)
+        (output / "provenance.json").write_text(json.dumps(provenance, indent=2) + "\n")
+    print(
+        f"Built disclosed derivative in {output}; not installed. Run the real TLS tests before use."
+    )
+
+
+if __name__ == "__main__":
+    main()

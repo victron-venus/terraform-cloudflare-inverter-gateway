@@ -30,7 +30,7 @@ copies; a green syntax/validate job is not a reviewed plan or a deployment.
 ## Project limits and rollout requirements
 
 - Validation-only policy: no synthetic beta/RC artifacts or tag-triggered stable releases.
-- Terraform fmt/validate use disposable source copies with backend disabled; no plan, apply, remote-state or live-provider checks. Portainer uses redacted compose fixtures. Inventory and archived monolith are excluded.
+- Terraform format/schema validation and plan-only mock-provider policy tests use disposable source copies; no apply, remote-state or live-resource checks.
 - Dependency review remains a PR-only comparison; callable full-source validation workflows run for nightly and candidate checks.
 
 For public repositories, merge and verify the workflows before enabling the
