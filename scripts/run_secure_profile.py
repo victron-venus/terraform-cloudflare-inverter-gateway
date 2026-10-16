@@ -18,7 +18,7 @@ def reject_remote_backend(workspace):
     """Fail closed for cloud/backend declarations, even if commented ambiguously."""
     for source in [*workspace.glob("*.tf"), *workspace.glob("*.tf.json")]:
         text = source.read_text()
-        if re.search(r'\b(?:cloud|backend)\s*(?:"[^"]*")?\s*\{', text) or (
+        if re.search(r'\b(?:cloud\s*\{|backend\s*"[^"]*"\s*\{)', text) or (
             source.suffix == ".json" and re.search(r'"(?:cloud|backend)"\s*:', text)
         ):
             raise ValueError(
