@@ -59,7 +59,7 @@ def main():
     )
     if hashlib.sha256(tofu.read_bytes()).hexdigest() != tool_hashes.get(args.platform):
         raise ValueError(
-            "OpenTofu binary is not the qualified official1.13.1 build for this platform"
+            "OpenTofu binary is not the qualified official 1.13.1 build for this platform"
         )
     if args.command == "init" and args.arguments:
         raise ValueError("Additional init options are not supported")
@@ -115,7 +115,7 @@ def main():
         )
         if metadata.get("terraform_version") != "1.13.1":
             raise ValueError(
-                "This profile requires the verified OpenTofu1.13.1 executable"
+                "This profile requires the verified OpenTofu 1.13.1 executable"
             )
         # No registry fallback exists. Re-init recreates temporary provider symlinks.
         subprocess.run(

@@ -4,7 +4,7 @@
 
 ### Changes
 
-- Validate the Scorecard5.6 report contract without ignoring runtime errors.
+- Validate the Scorecard 5.6 report contract without ignoring runtime errors.
 - Exercise allowlist, service-token binding, tunnel JWT/catch-all and sensitive
   output behavior using four isolated mock plans. Reject empty/wildcard allowlists.
 - Add a verified strict TLS profile and a FLOSS OpenTofu validation route.
@@ -24,8 +24,15 @@ explicit list of addresses. This source change does not migrate or apply state.
 
 Mock plans and TLS fixtures use synthetic data only. Strict TLS is a documented
 opt-in execution profile and may reject old endpoint certificates. Protect state
-and generated credential files. No new application vulnerability identifier is assigned. The dependency review distinguishes older official Cloudflare binaries from the
-disclosed provider build and the bounded engine/local-provider profiles. Recent
+and generated credential files. No new application vulnerability identifier is
+assigned. The disclosed provider build updates dependencies affected by
+CVE-2026-32283 (TLS KeyUpdate handling), CVE-2026-32280 (certificate-chain
+building) and CVE-2026-33814 (HTTP/2 transport). The
+[dependency review](docs/dependency-security.md) links the upstream advisories
+and distinguishes older official Cloudflare binaries from the disclosed build
+and bounded engine/local-provider profiles. Select the new profile only after
+all documented qualification steps pass; this source update does not replace
+an existing deployment's provider or state automatically. Recent
 engine advisories remain tracked; no claim covers arbitrary engine features or
 an existing deployment that has not selected the verified profile.
 

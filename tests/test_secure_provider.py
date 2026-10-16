@@ -3,8 +3,10 @@
 import importlib.util
 import io
 import os
+import sys
 import tarfile
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -17,6 +19,29 @@ SPEC.loader.exec_module(MODULE)
 
 
 class SecureProviderBuildTests(unittest.TestCase):
+    def test_timeout_stops_child_even_if_driver_exits_on_term(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            marker = root / "heartbeat"
+            child = (
+                "import signal,time,pathlib; signal.signal(signal.SIGTERM,signal.SIG_IGN); "
+                f"p=pathlib.Path({str(marker)!r}); "
+                "exec('while True:\\n p.write_text(str(time.monotonic()))\\n time.sleep(0.02)')"
+            )
+            driver = (
+                "import subprocess,sys,time; "
+                f"subprocess.Popen([sys.executable,'-c',{child!r}]); time.sleep(60)"
+            )
+            with self.assertRaisesRegex(SystemExit, "Build stage exceeded"):
+                MODULE.run(
+                    [sys.executable, "-c", driver], root, dict(os.environ),
+                    root / "stage.log", timeout=1,
+                )
+            self.assertTrue(marker.exists(), "Synthetic child must run before timeout")
+            stopped = marker.read_text()
+            time.sleep(0.1)
+            self.assertEqual(marker.read_text(), stopped)
+
     def test_archive_cannot_escape_or_create_links(self):
         for name, kind in [
             ("../escape", tarfile.REGTYPE),

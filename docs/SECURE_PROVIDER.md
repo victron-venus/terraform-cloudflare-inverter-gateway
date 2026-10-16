@@ -11,7 +11,7 @@ SHA-256, the exact replacement `go.mod`/`go.sum` hashes, Go 1.27.2, and the scan
 version. The direct updates are x/net 0.60.0, x/text 0.42.0, x/crypto 0.57.0 and
 gRPC 1.83.2; their required transitive updates are visible in the module files.
 No provider resource implementation is patched. The internal version string is
-`5.24.0-openssf.1`, and the original MPL-2.0 license is retained with the output.
+`5.24.0-openssf.1`, and the original Apache-2.0 license is retained with the output.
 
 ## Build and qualify
 
@@ -39,6 +39,8 @@ path traversal, removes inherited cloud credentials and compiler settings, and
 records logs, dependency files, the upstream license and `provenance.json`.
 Acceptance tests requiring a real Cloudflare account are excluded. No Terraform
 command, provider installation, infrastructure change, or state access occurs.
+Each build stage has a one-hour timeout. An interrupted or timed-out stage stops
+its entire compiler process group and cannot produce completed provenance.
 
 The source scan is a call-graph analysis, not a claim that every behavior is
 tested. A nonzero scanner result or unit-test failure prevents a completed

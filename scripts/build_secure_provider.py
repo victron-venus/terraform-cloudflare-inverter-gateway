@@ -5,6 +5,7 @@ import argparse
 import hashlib
 import json
 import os
+import signal
 import shutil
 import ssl
 import subprocess
@@ -100,18 +101,47 @@ def clean_environment(root, go):
     }
 
 
-def run(command, source, environment, log):
+def stop_group(process):
+    """Terminate the compiler and its children, not only the Go driver."""
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        process.wait()
+        return
+    try:
+        process.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        pass
+    # The driver may exit before a child that ignored SIGTERM. Finish the group.
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    process.wait()
+
+
+def run(command, source, environment, log, timeout=3600):
     """Retain the complete result and stop on a failed qualification stage."""
     print("Running:", " ".join(map(str, command)), flush=True)
     with log.open("w", encoding="utf-8") as stream:
-        subprocess.run(
+        process = subprocess.Popen(
             list(map(str, command)),
             cwd=source,
             env=environment,
             stdout=stream,
             stderr=subprocess.STDOUT,
-            check=True,
+            start_new_session=True,
         )
+        try:
+            result = process.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            stop_group(process)
+            raise SystemExit(f"Build stage exceeded {timeout} seconds; see {log}") from None
+        except BaseException:
+            stop_group(process)
+            raise
+        if result:
+            raise subprocess.CalledProcessError(result, command)
 
 
 def main():
@@ -145,7 +175,8 @@ def main():
         (temporary / "tmp").mkdir()
         environment = clean_environment(temporary, go)
         actual = subprocess.check_output(
-            [str(go), "env", "GOVERSION"], cwd=temporary, env=environment, text=True
+            [str(go), "env", "GOVERSION"], cwd=temporary, env=environment, text=True,
+            timeout=30,
         ).strip()
         if actual != manifest["go_version"]:
             raise SystemExit(

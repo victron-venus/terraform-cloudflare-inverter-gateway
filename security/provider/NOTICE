@@ -2,7 +2,7 @@ The go.mod and go.sum files in this directory are derived from
 cloudflare/terraform-provider-cloudflare commit
 4f360d592a7d968c684a9b212c26808534b7c0d3 (v5.24.0).
 
-Copyright Cloudflare and contributors. The upstream Mozilla Public License 2.0
+Copyright Cloudflare and contributors. The upstream Apache License 2.0
 is preserved in LICENSE. These dependency manifests were modified to update the
 Go dependency graph for the disclosed security build; they are not relicensed
 under this repository's root MIT license.
