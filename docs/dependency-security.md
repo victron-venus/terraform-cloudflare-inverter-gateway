@@ -76,3 +76,19 @@ only independent sumdb/dirhash is imported. Its additional gRPC advisory
 published September 15. Reassess that record before November 14, 2026.
 The same local-backend/AutoMTLS boundary applies; arbitrary engine features
 are outside this evidence.
+
+## Unchanged local file provider
+
+The official local provider 2.9.0 also embeds Go 1.25.8. This module only uses
+`local_sensitive_file`, whose source performs owner-authorized file operations
+and compatibility checksums; it does not use the provider's command/actions,
+HTTP clients or document parsers. It does not call the `os.Root` APIs involved in
+the related root-escape advisories. The qualified Linux/Darwin wrapper enforces
+umask 0077 and retains AutoMTLS: provider RPC uses an owner-only Unix socket,
+not a public network server. See [local provider source](https://github.com/hashicorp/terraform-provider-local/tree/3561e410f9fe1769a419c23adb8f1a9b89929b66)
+and [go-plugin listener](https://github.com/hashicorp/go-plugin/blob/v1.7.0/server.go#L578).
+Its 50 binary advisory matches are retained as dependency evidence; no relevant
+public input, hostile socket peer or affected `os.Root` operation was identified
+in this bounded profile. Windows, shared sockets, arbitrary local commands,
+untrusted paths and altered resource definitions require a new assessment.
+MD5/SHA1 compatibility outputs are not used as authentication/integrity proofs.

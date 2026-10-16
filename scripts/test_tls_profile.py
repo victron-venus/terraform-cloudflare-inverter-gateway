@@ -14,6 +14,7 @@ import pathlib
 import shutil
 import ssl
 import subprocess
+import sys
 import tempfile
 import threading
 import zipfile
@@ -26,6 +27,29 @@ from cryptography.x509.oid import NameOID
 TF = pathlib.Path(os.environ["TLS_TEST_TERRAFORM"]).resolve()
 PROV = pathlib.Path(os.environ["TLS_TEST_PROVIDER_DIR"]).resolve()
 PLATFORM = os.environ["TLS_TEST_PLATFORM"]
+
+
+def engine_command(command, arguments, root, strict):
+    """Optionally exercise the real supported wrapper for strict-mode cases."""
+    profile = os.environ.get("TLS_TEST_PROFILE_ROOT")
+    if strict and profile:
+        return [
+            sys.executable,
+            str(pathlib.Path(profile) / "scripts/run_secure_profile.py"),
+            "--tofu",
+            str(TF),
+            "--provider-dir",
+            str(PROV),
+            "--local-provider-archive",
+            os.environ["TLS_TEST_LOCAL_ARCHIVE"],
+            "--directory",
+            str(root),
+            "--platform",
+            PLATFORM,
+            command,
+            *(arguments if command != "init" else []),
+        ]
+    return [str(TF), command, *arguments]
 
 
 def run(bits, strict, mode):
@@ -137,7 +161,9 @@ def run(bits, strict, mode):
         if strict:
             env["GODEBUG"] = "fips140=on"
         ini = subprocess.run(
-            [str(TF), "init", "-backend=false", "-input=false", "-no-color"],
+            engine_command(
+                "init", ["-backend=false", "-input=false", "-no-color"], root, strict
+            ),
             cwd=root,
             env=env,
             capture_output=True,
@@ -148,7 +174,7 @@ def run(bits, strict, mode):
         plan = None
         if not ini.returncode:
             plan = subprocess.run(
-                [str(TF), "plan", "-input=false", "-no-color"],
+                engine_command("plan", ["-input=false", "-no-color"], root, strict),
                 cwd=root,
                 env=env,
                 capture_output=True,

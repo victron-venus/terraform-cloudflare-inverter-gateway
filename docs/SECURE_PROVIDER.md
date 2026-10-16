@@ -63,34 +63,46 @@ Authorization reaches the fixture. This test uses synthetic credentials and
 never applies infrastructure. Engine and provider advisories must still be
 reviewed independently; a key-length test cannot establish their absence.
 
-## Explicit local selection
+## Recommended local execution profile
 
-The build intentionally does not change `.terraform.lock.hcl`, `.terraformrc`,
-operator state or the module's default registry provider. After reviewing a
-successful build's provenance and transport results, a local operator can create
-a separate, private CLI configuration:
+For a new independent deployment, export the reviewed repository into a new
+private workspace. Remove the commented `cloud {}` example from that copy and
+remove its copied `.terraform.lock.hcl` so the disclosed derivative receives its
+own lock digest. The module's explicit provider origins and version constraint
+support OpenTofu 1.13.1 directly. Configure only resources assigned to this new
+state; do not target resources already managed by another deployment.
 
-```hcl
-provider_installation {
-  dev_overrides {
-    "registry.terraform.io/cloudflare/cloudflare" = "/absolute/path/to/new-provider-build"
-  }
-  direct {}
-}
+Run the wrapper from the reviewed original checkout for every command:
+
+```sh
+python3 scripts/run_secure_profile.py --tofu /VERIFIED/tofu \
+  --provider-dir /PRIVATE/cloudflare-provider --platform linux_arm64 \
+  --local-provider-archive /VERIFIED/terraform-provider-local_2.9.0_linux_arm64.zip \
+  --directory /NEW/PRIVATE/WORKSPACE init
+python3 scripts/run_secure_profile.py --tofu /VERIFIED/tofu \
+  --provider-dir /PRIVATE/cloudflare-provider --platform linux_arm64 \
+  --local-provider-archive /VERIFIED/terraform-provider-local_2.9.0_linux_arm64.zip \
+  --directory /NEW/PRIVATE/WORKSPACE plan -var-file=local.secrets.tfvars -out=reviewed.tfplan
+# Only after reviewing the exact plan and approving its intended changes:
+python3 scripts/run_secure_profile.py --tofu /VERIFIED/tofu \
+  --provider-dir /PRIVATE/cloudflare-provider --platform linux_arm64 \
+  --local-provider-archive /VERIFIED/terraform-provider-local_2.9.0_linux_arm64.zip \
+  --directory /NEW/PRIVATE/WORKSPACE apply reviewed.tfplan
 ```
 
-Select it explicitly with `TF_CLI_CONFIG_FILE=/absolute/path/to/that-config` and
-`GODEBUG=fips140=on` for the intended process. Development overrides deliberately
-bypass the registry package checksums during provider execution: review the
-recorded source and binary SHA-256 instead. Initialization may still download
-the official registry package; the explicit override selects the disclosed local
-executable for subsequent provider operations. Terraform warns about this
-override, as expected. Do not remove that warning or portray the binary as a
-publisher-signed registry artifact. Never use an unrelated shared override file.
+The wrapper checks the exact official engine hash/version, derivative manifest
+and binary hash, and locked official local-provider ZIP on each invocation. It
+uses a filesystem-only mirror with no fallback to the old Cloudflare binary,
+forces FIPS TLS, retains only explicit variable/authentication inputs, and
+rejects cloud/remote-backend declarations or cached remote configuration. The
+provider IPC retains AutoMTLS; child processes use umask 0077 so Unix sockets
+and newly created state remain private even under a permissive caller umask. Only recorded engine platforms are accepted.
 
-Normal review and deployment acceptance remain required before any real apply.
-Requalify compiler/dependency updates, and prefer an equivalent fixed official
-provider once it is available and has passed the same checks.
+This is an explicit local deployment option. It does not upgrade existing state,
+change the original repository lock, or replace providers in HCP remote workers.
+Existing deployments need a separately reviewed state/provider migration and
+acceptance plan. Do not remove state or `.terraform` directories as an automatic
+migration step. Live apply has not been performed by this qualification.
 
 ## Validate this repository with the derivative
 

@@ -36,10 +36,10 @@ See [CI and deployment workflow](docs/release-workflow.md) for required checks a
 ```bash
 cp local.secrets.tfvars.example local.secrets.tfvars
 # edit local.secrets.tfvars
-terraform init
-terraform plan  -var-file=local.secrets.tfvars
-terraform apply -var-file=local.secrets.tfvars
+# use the verified local execution profile linked below
 ```
+
+For new deployments, use the [verified local execution profile](docs/SECURE_PROVIDER.md#recommended-local-execution-profile), which selects the disclosed provider security build and checks its provenance on every command. The official provider binary retains older runtime vulnerabilities; direct unqualified `terraform` commands do not select the corrected profile. Existing state/provider migrations require a separate review.
 
 Auth matches `rules_lists`: Global API Key via bashrc (auto-picked by Terraform):
 
@@ -85,16 +85,13 @@ Authorization: Bearer <GATEWAY_API_TOKEN>
 
 **Currently local by default.** The optional `cloud {}` block in `versions.tf` is commented out, so `terraform init` uses local state.
 
-If you later enable HCP Terraform by uncommenting that block (org/workspace of your choosing; placeholder name `terraform-cloudflare-inverter-gateway`), detach again for local runs as follows:
-
-1. Comment out the entire `cloud { ... }` block in `versions.tf` again.
-2. `rm -rf .terraform`
-3. `terraform init` (local state)
-4. Provide variables locally (`local.secrets.tfvars` / `TF_VAR_*`) — TFC workspace variables are **not** used when detached.
-
-Optional: while still attached, `terraform state pull > terraform.tfstate` before detaching, then confirm with `terraform state list`. Keep state files **gitignored**.
-
-Do not apply from both TFC and local against the same resources without coordinating state. Never commit credentials, secrets tfvars, or state files.
+The verified local profile rejects active or commented cloud/backend blocks;
+remove the example block only in the new private deployment copy. HCP remote
+workers do not inherit a local provider build or environment. Migrating an
+existing HCP deployment requires an explicit state backup, ownership and access
+review, planned migration, and verification. This documentation does not perform
+that migration. Do not apply the same resources from independent states.
+Never commit credentials, private variables or state files.
 
 ## Repo provisioning
 
@@ -114,6 +111,6 @@ The [OpenTofu route](docs/OPENTOFU.md) supports FLOSS development, and the
 See [source changes](CHANGELOG.md), [governance](GOVERNANCE.md),
 [conduct](CODE_OF_CONDUCT.md) and the [roadmap](docs/roadmap.md).
 
-The optional [disclosed provider security patch](docs/SECURE_PROVIDER.md) provides
+The [disclosed provider security patch](docs/SECURE_PROVIDER.md) provides
 a pinned source build and qualification path while official provider binaries
 retain the runtime findings documented in the dependency review.

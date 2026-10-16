@@ -5,9 +5,12 @@ official-tool vulnerability findings. Successful key-length calibration does not
 remediate them or establish Passing readiness.
 
 The maintained module delegates network operations to Terraform/OpenTofu and the
-Cloudflare provider; it does not implement cryptographic primitives. The verified
-profile uses official Terraform **1.16.6** (Go **1.26.8**) or OpenTofu **1.13.1**
-(Go **1.27.1**) with the locked Cloudflare provider **5.24.0** (Go **1.25.8**).
+Cloudflare provider; it does not implement cryptographic primitives. The transport calibration uses official Terraform **1.16.6** (Go **1.26.8**) or OpenTofu **1.13.1**
+(Go **1.27.1**) with the original Cloudflare provider **5.24.0** (Go **1.25.8**).
+That original provider is only the baseline for comparison. The recommended
+[local execution profile](SECURE_PROVIDER.md) selects the disclosed
+**5.24.0-openssf.1** derivative built with Go **1.27.2** and updated dependencies;
+its full qualification is tracked separately.
 Verify authenticated publisher checksums and inspect each actual executable with
 `go version -m /absolute/path/to/binary`. Do not assume a similarly named custom
 or older binary enforces the same policy.
@@ -27,10 +30,9 @@ Do not set `TF_DISABLE_PLUGIN_TLS` or `TF_REATTACH_PROVIDERS`. Keep the
 engine-managed provider IPC private to the same local user; do not expose a
 shared plugin socket or add untrusted provider overrides.
 
-Use local execution; the checked-in module has no active remote backend. If an
-operator adds HCP remote state, use Local execution mode for this profile. Remote
-runners do not inherit a workstation's environment and require their own verified
-binaries and settings. No qualification operation reads operator state or applies
+Use local execution and local state; the checked-in module has no active remote
+backend. The recommended wrapper rejects remote-backend configuration. Remote
+runners and HCP state workflows require their own separate qualification. No qualification operation reads operator state or applies
 this module.
 
 The Cloudflare provider's Go standard-library cryptography and the local provider
