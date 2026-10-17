@@ -41,7 +41,8 @@ cp local.secrets.tfvars.example local.secrets.tfvars
 
 For new deployments, use the [verified local execution profile](docs/SECURE_PROVIDER.md#recommended-local-execution-profile), which selects the disclosed provider security build and checks its provenance on every command. The official provider binary retains older runtime vulnerabilities; direct unqualified `terraform` commands do not select the corrected profile. Existing state/provider migrations require a separate review.
 
-Auth matches `rules_lists`: Global API Key via bashrc (auto-picked by Terraform):
+The module accepts Cloudflare account and Global API Key credentials through
+Terraform variables. Export them in the shell used for the verified local profile:
 
 ```bash
 export TF_VAR_account_xyz=...
@@ -92,10 +93,6 @@ existing HCP deployment requires an explicit state backup, ownership and access
 review, planned migration, and verification. This documentation does not perform
 that migration. Do not apply the same resources from independent states.
 Never commit credentials, private variables or state files.
-
-## Repo provisioning
-
-GitHub repository is created under [`victron-venus`](https://github.com/victron-venus) and tracked by [`terraform-github-victron`](https://github.com/4alvit/terraform-github-victron).
 
 ## Contributing and security
 
