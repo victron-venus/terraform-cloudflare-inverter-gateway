@@ -9,7 +9,7 @@ Cloudflare provider; it does not implement cryptographic primitives. The transpo
 (Go **1.27.1**) with the original Cloudflare provider **5.24.0** (Go **1.25.8**).
 That original provider is only the baseline for comparison. The recommended
 [local execution profile](SECURE_PROVIDER.md) selects the disclosed
-**5.24.0-openssf.1** derivative built with Go **1.27.2** and updated dependencies;
+**5.24.0-openssf.2** derivative built with Go **1.27.2** and updated dependencies;
 its full qualification is tracked separately.
 Verify authenticated publisher checksums and inspect each actual executable with
 `go version -m /absolute/path/to/binary`. Do not assume a similarly named custom
