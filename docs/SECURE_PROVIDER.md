@@ -10,8 +10,11 @@ provider source and updates its compiler and Go dependency graph. It is a
 SHA-256, the exact replacement `go.mod`/`go.sum` hashes, Go 1.27.2, and the scanner
 version. The direct updates are x/net 0.60.0, x/text 0.42.0, x/crypto 0.57.0 and
 gRPC 1.83.2; their required transitive updates are visible in the module files.
+The derivative also pins Goldmark 1.7.17, which fixes
+[GO-2026-5320](https://pkg.go.dev/vuln/GO-2026-5320) in the documentation dependency graph.
+This change does not establish that the provider runtime exposes the affected HTML renderer.
 No provider resource implementation is patched. The internal version string is
-`5.24.0-openssf.1`, and the original Apache-2.0 license is retained with the output.
+`5.24.0-openssf.2`, and the original Apache-2.0 license is retained with the output.
 
 ## Build and qualify
 
