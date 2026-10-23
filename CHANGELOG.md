@@ -1,5 +1,16 @@
 # Source change history
 
+## 2026-10-22
+
+### Security
+
+- Select Go 1.27.3 for the disclosed `5.24.0-openssf.3` provider build to address
+  [GO-2026-6809](https://pkg.go.dev/vuln/GO-2026-6809) in certificate verification.
+  Preserve the upstream source and module graph. All sixteen unit-test shards
+  and the existing production/TLS qualification must pass with fresh receipts
+  before this build is selected. This does not replace an installed provider or
+  modify infrastructure state.
+
 ## 2026-10-16
 
 ### Changes

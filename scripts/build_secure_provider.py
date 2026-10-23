@@ -182,7 +182,7 @@ def parse_arguments():
     """Validate explicit standalone, shard, or complete-receipt modes."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--go", required=True, type=Path, help="Verified Go 1.27.2 executable"
+        "--go", required=True, type=Path, help="Verified Go 1.27.3 executable"
     )
     parser.add_argument(
         "--output", required=True, type=Path, help="New artifact directory"
