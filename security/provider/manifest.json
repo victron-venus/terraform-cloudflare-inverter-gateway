@@ -5,9 +5,9 @@
   "source_root": "terraform-provider-cloudflare-4f360d592a7d968c684a9b212c26808534b7c0d3",
   "provider_address": "registry.terraform.io/cloudflare/cloudflare",
   "upstream_version": "5.24.0",
-  "build_version": "5.24.0-openssf.2",
+  "build_version": "5.24.0-openssf.3",
   "binary_name": "terraform-provider-cloudflare_v5.24.0",
-  "go_version": "go1.27.2",
+  "go_version": "go1.27.3",
   "govulncheck_version": "v1.9.0",
   "module_files": {
     "go.mod": "0445e963cfd7509177fa2664c62e232a603d85179844885edfd20a4c5381e103",
