@@ -3,6 +3,7 @@
 import contextlib
 import importlib.util
 import io
+import json
 import os
 import shutil
 import subprocess
@@ -57,6 +58,50 @@ class SecureProviderBuildTests(unittest.TestCase):
             for name in names:
                 self.assertEqual((root / name).read_text(), "ran")
 
+    def test_scan_only_never_runs_tests_or_emits_binary_qualification(self):
+        manifest = json.loads((Path(__file__).parents[1] / "security/provider/manifest.json").read_text())
+        original_digest = MODULE.digest
+        for failure in (False, True):
+            with self.subTest(failure=failure), tempfile.TemporaryDirectory() as directory:
+                output = Path(directory) / "output"
+                args = SimpleNamespace(go=Path(sys.executable), output=output, scan_only=True,
+                                       platform="linux_amd64", test_shard=None, test_receipts=None)
+                def extract(_archive, temporary):
+                    source = temporary / manifest["source_root"]
+                    source.mkdir()
+                    (source / "LICENSE").write_text("fixture license")
+                def stage(command, _source, environment, log, **_kwargs):
+                    self.assertNotIn("test", command)
+                    self.assertNotIn("build", command)
+                    log.write_text("fixture scanner output")
+                    if log.name == "source-vulnerabilities.log":
+                        self.assertEqual(environment["GOOS"], "linux")
+                        self.assertEqual(environment["GOARCH"], "amd64")
+                    else:
+                        self.assertNotIn("GOOS", environment)
+                        self.assertNotIn("GOARCH", environment)
+                    if failure and log.name == "source-vulnerabilities.log":
+                        raise subprocess.CalledProcessError(1, command)
+                def digest(path):
+                    return manifest["source_sha256"] if path.name == "source.tar.gz" else original_digest(path)
+                with patch.object(MODULE, "parse_arguments", return_value=args), patch.object(
+                    MODULE.subprocess, "check_output", return_value=manifest["go_version"]
+                ), patch.object(MODULE, "download_source"), patch.object(MODULE, "extract_source", side_effect=extract), patch.object(
+                    MODULE, "digest", side_effect=digest
+                ), patch.object(MODULE, "run", side_effect=stage), patch.object(MODULE, "qualify_tests") as qualify:
+                    if failure:
+                        with self.assertRaises(subprocess.CalledProcessError):
+                            MODULE.main()
+                        self.assertFalse((output / "source-scan.json").exists())
+                    else:
+                        MODULE.main()
+                        evidence = json.loads((output / "source-scan.json").read_text())
+                        self.assertFalse(evidence["unit_tests_executed"])
+                        self.assertFalse(evidence["binary_emitted"])
+                    qualify.assert_not_called()
+                    self.assertFalse((output / "provenance.json").exists())
+                    self.assertFalse((output / manifest["binary_name"]).exists())
+
     def test_standalone_retains_full_suite_with_multi_hour_budget(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -84,6 +129,10 @@ class SecureProviderBuildTests(unittest.TestCase):
                     )
             self.assertEqual((root / "stage.log").read_text(), "fixture diagnostic\n")
             self.assertIn("fixture diagnostic", output.getvalue())
+            timing = json.loads((root / "stage-timings.jsonl").read_text())
+            self.assertEqual(timing["stage"], "stage")
+            self.assertFalse(timing["success"])
+            self.assertGreaterEqual(timing["elapsed_seconds"], 0)
 
     def test_timeout_stops_child_even_if_driver_exits_on_term(self):
         with tempfile.TemporaryDirectory() as directory:

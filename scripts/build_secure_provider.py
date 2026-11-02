@@ -141,6 +141,22 @@ def unit_test_command(go, packages=None):
 
 
 def run(command, source, environment, log, timeout=3600):
+    """Record stage duration without treating a failed stage as qualification."""
+    started = time.monotonic()
+    succeeded = False
+    try:
+        _run(command, source, environment, log, timeout)
+        succeeded = True
+    finally:
+        with (log.parent / "stage-timings.jsonl").open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps({
+                "stage": log.stem,
+                "elapsed_seconds": round(time.monotonic() - started, 3),
+                "success": succeeded,
+            }) + "\n")
+
+
+def _run(command, source, environment, log, timeout=3600):
     """Retain the complete result and stop on a failed qualification stage."""
     print("Running:", " ".join(map(str, command)), flush=True)
     with log.open("w", encoding="utf-8") as stream:
@@ -193,6 +209,10 @@ def parse_arguments():
         required=True,
     )
     mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
+        "--scan-only", action="store_true",
+        help="Verify pinned source/modules and scan current advisories; emit no binary or test qualification",
+    )
     mode.add_argument(
         "--test-shard",
         type=int,
@@ -277,6 +297,25 @@ def qualify_tests(go, source, environment, output, args, manifest, actual):
     return {"unit_test_shards": summary, "qualification_id": args.qualification_id}
 
 
+def write_scan_evidence(source, output, manifest, actual, platform):
+    """Record a target-platform scan without implying complete qualification."""
+    for name, expected in manifest["module_files"].items():
+        if digest(source / name) != expected:
+            raise SystemExit(f"Scan changed pinned dependencies: {name}")
+    evidence = {
+        "kind": "source-vulnerability-scan",
+        "manifest": manifest,
+        "actual_go_version": actual,
+        "platform": platform,
+        "builder_sha256": digest(Path(__file__)),
+        "scan_log_sha256": digest(output / "source-vulnerabilities.log"),
+        "unit_tests_executed": False,
+        "binary_emitted": False,
+    }
+    (output / "source-scan.json").write_text(json.dumps(evidence, indent=2) + "\n")
+    print("Fresh source vulnerability scan passed; no binary or full qualification emitted.")
+
+
 def main():
     """Build and qualify a pinned, explicitly labelled derivative provider."""
     args = parse_arguments()
@@ -329,24 +368,27 @@ def main():
             environment,
             output / "scanner-install.log",
         )
-        run(
-            [temporary / "bin/govulncheck", "-show", "traces", "."],
-            source,
-            environment,
-            output / "source-vulnerabilities.log",
-        )
-        test_evidence = qualify_tests(
-            go, source, environment, output, args, manifest, actual
-        )
-        if args.test_shard is not None:
-            return
-        binary = output / manifest["binary_name"]
         platform_os, platform_arch = args.platform.split("_")
         target_environment = {
             **environment,
             "GOOS": platform_os,
             "GOARCH": platform_arch,
         }
+        run(
+            [temporary / "bin/govulncheck", "-show", "traces", "."],
+            source,
+            target_environment,
+            output / "source-vulnerabilities.log",
+        )
+        if args.scan_only:
+            write_scan_evidence(source, output, manifest, actual, args.platform)
+            return
+        test_evidence = qualify_tests(
+            go, source, environment, output, args, manifest, actual
+        )
+        if args.test_shard is not None:
+            return
+        binary = output / manifest["binary_name"]
         run(
             [
                 go,
