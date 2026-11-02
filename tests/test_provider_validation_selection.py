@@ -115,19 +115,20 @@ class SelectionTests(unittest.TestCase):
             self.assertEqual(SELECT.select(REPO, SHA, "schedule", NOW)["mode"], "full")
 
     def test_artifact_digest_ownership_expiration_and_member_safety(self):
+        run = run_fixture()
         metadata, body = archive_fixture([("receipt.json", b"{}")])
         with patch.object(SELECT, "github", return_value=body):
-            self.assertEqual(SELECT.archive_files(metadata, run_fixture(), REPO), {"receipt.json": b"{}"})
+            self.assertEqual(SELECT.archive_files(metadata, run, REPO), {"receipt.json": b"{}"})
             for key, value in (("expired", True), ("size_in_bytes", SELECT.MAX_ARCHIVE + 1),
                                ("digest", "sha256:" + "0" * 64)):
                 broken = {**metadata, key: value}
                 with self.subTest(key=key), self.assertRaises(ValueError):
-                    SELECT.archive_files(broken, run_fixture(), REPO)
+                    SELECT.archive_files(broken, run, REPO)
             for key in ("id", "head_sha", "head_branch", "repository_id", "head_repository_id"):
                 broken = deepcopy(metadata)
                 broken["workflow_run"][key] = "outside"
                 with self.subTest(key=key), self.assertRaises(ValueError):
-                    SELECT.archive_files(broken, run_fixture(), REPO)
+                    SELECT.archive_files(broken, run, REPO)
         link = zipfile.ZipInfo("link")
         link.create_system = 3
         link.external_attr = 0o120777 << 16
@@ -135,9 +136,10 @@ class SelectionTests(unittest.TestCase):
                         [('file', b'x'), ('file', b'y')], [(link, b'target')]):
             metadata, body = archive_fixture(entries)
             with patch.object(SELECT, "github", return_value=body), self.assertRaises(ValueError):
-                SELECT.archive_files(metadata, run_fixture(), REPO)
+                SELECT.archive_files(metadata, run, REPO)
 
     def test_real_receipt_reconciliation_and_tampered_inputs(self):
+        run = run_fixture()
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             pin = root / "security/provider"
@@ -178,18 +180,18 @@ class SelectionTests(unittest.TestCase):
                 **{name: (pin / name).read_bytes() for name in ("go.mod", "go.sum")}}
             artifacts = [{"name": name} for name in records]
             with patch.object(SELECT, "archive_files", side_effect=lambda artifact, *_: records[artifact["name"]]):
-                self.assertEqual(SELECT.verify_receipts(artifacts, run_fixture(), REPO, root), summary)
+                self.assertEqual(SELECT.verify_receipts(artifacts, run, REPO, root), summary)
                 for changed in (artifacts[:-1], artifacts + [artifacts[0]]):
                     with self.assertRaises(ValueError):
-                        SELECT.verify_receipts(changed, run_fixture(), REPO, root)
+                        SELECT.verify_receipts(changed, run, REPO, root)
                 original = records["provider-unit-receipt-0"]["shard-0.log"]
                 records["provider-unit-receipt-0"]["shard-0.log"] = b"tampered"
                 with self.assertRaises(ValueError):
-                    SELECT.verify_receipts(artifacts, run_fixture(), REPO, root)
+                    SELECT.verify_receipts(artifacts, run, REPO, root)
                 records["provider-unit-receipt-0"]["shard-0.log"] = original
                 (scripts / "build_secure_provider.py").write_text("changed builder")
                 with self.assertRaises(ValueError):
-                    SELECT.verify_receipts(artifacts, run_fixture(), REPO, root)
+                    SELECT.verify_receipts(artifacts, run, REPO, root)
 
 
 if __name__ == "__main__":

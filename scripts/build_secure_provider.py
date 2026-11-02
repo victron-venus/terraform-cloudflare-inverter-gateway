@@ -297,6 +297,25 @@ def qualify_tests(go, source, environment, output, args, manifest, actual):
     return {"unit_test_shards": summary, "qualification_id": args.qualification_id}
 
 
+def write_scan_evidence(source, output, manifest, actual, platform):
+    """Record a target-platform scan without implying complete qualification."""
+    for name, expected in manifest["module_files"].items():
+        if digest(source / name) != expected:
+            raise SystemExit(f"Scan changed pinned dependencies: {name}")
+    evidence = {
+        "kind": "source-vulnerability-scan",
+        "manifest": manifest,
+        "actual_go_version": actual,
+        "platform": platform,
+        "builder_sha256": digest(Path(__file__)),
+        "scan_log_sha256": digest(output / "source-vulnerabilities.log"),
+        "unit_tests_executed": False,
+        "binary_emitted": False,
+    }
+    (output / "source-scan.json").write_text(json.dumps(evidence, indent=2) + "\n")
+    print("Fresh source vulnerability scan passed; no binary or full qualification emitted.")
+
+
 def main():
     """Build and qualify a pinned, explicitly labelled derivative provider."""
     args = parse_arguments()
@@ -362,21 +381,7 @@ def main():
             output / "source-vulnerabilities.log",
         )
         if args.scan_only:
-            for name, expected in manifest["module_files"].items():
-                if digest(source / name) != expected:
-                    raise SystemExit(f"Scan changed pinned dependencies: {name}")
-            evidence = {
-                "kind": "source-vulnerability-scan",
-                "manifest": manifest,
-                "actual_go_version": actual,
-                "platform": args.platform,
-                "builder_sha256": digest(Path(__file__)),
-                "scan_log_sha256": digest(output / "source-vulnerabilities.log"),
-                "unit_tests_executed": False,
-                "binary_emitted": False,
-            }
-            (output / "source-scan.json").write_text(json.dumps(evidence, indent=2) + "\n")
-            print("Fresh source vulnerability scan passed; no binary or full qualification emitted.")
+            write_scan_evidence(source, output, manifest, actual, args.platform)
             return
         test_evidence = qualify_tests(
             go, source, environment, output, args, manifest, actual

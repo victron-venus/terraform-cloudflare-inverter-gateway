@@ -193,7 +193,8 @@ def main():
     args = parser.parse_args()
     result = select(os.environ["GITHUB_REPOSITORY"], os.environ["GITHUB_SHA"],
                     os.environ["GITHUB_EVENT_NAME"])
-    args.output.write_text(json.dumps(result, indent=2) + "\n")
+    with args.output.open("x", encoding="utf-8") as stream:
+        stream.write(json.dumps(result, indent=2) + "\n")
     if path := os.environ.get("GITHUB_OUTPUT"):
         with open(path, "a", encoding="utf-8") as stream:
             stream.write(f"mode={result['mode']}\n")
