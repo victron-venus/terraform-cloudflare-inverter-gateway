@@ -111,3 +111,7 @@ See [source changes](CHANGELOG.md), [governance](GOVERNANCE.md),
 The [disclosed provider security patch](docs/SECURE_PROVIDER.md) provides
 a pinned source build and qualification path while official provider binaries
 retain the runtime findings documented in the dependency review.
+
+Provider qualification caps concurrent test shards at four; scheduled scans can
+reuse a verified same-commit qualification for seven days while checking current
+advisories each time. See [runner capacity and qualification evidence](docs/SECURE_PROVIDER.md#shared-runner-capacity-and-scheduled-scans).

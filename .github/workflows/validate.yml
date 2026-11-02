@@ -5,12 +5,82 @@ name: Local validation
 permissions:
   contents: read
 jobs:
+  select:
+    name: Select provider validation
+    runs-on: ${{ fromJSON((vars.CI_RUNNER_MODE == 'self-hosted' || vars.CI_RUNNER_MODE == 'k3s') && ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || (contains(fromJSON('["push","schedule","workflow_dispatch"]'), github.event_name) && github.ref == format('refs/heads/{0}', github.event.repository.default_branch))) && (vars.CI_RUNNER_LABELS || '[]') || '["ubuntu-latest"]') }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      mode: ${{ steps.selection.outputs.mode }}
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: '3.12'
+      - name: Verify recent complete qualification
+        id: selection
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/select_provider_validation.py --output "$RUNNER_TEMP/provider-validation.json"
+      - name: Retain validation decision
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: provider-validation-decision
+          retention-days: 30
+          if-no-files-found: error
+          path: ${{ runner.temp }}/provider-validation.json
+  provider_scan:
+    name: Fresh provider vulnerability scan
+    needs: select
+    if: ${{ needs.select.outputs.mode == 'scan' }}
+    runs-on: ${{ fromJSON((vars.CI_RUNNER_MODE == 'self-hosted' || vars.CI_RUNNER_MODE == 'k3s') && ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || (contains(fromJSON('["push","schedule","workflow_dispatch"]'), github.event_name) && github.ref == format('refs/heads/{0}', github.event.repository.default_branch))) && (vars.CI_RUNNER_LABELS || '[]') || '["ubuntu-latest"]') }}
+    timeout-minutes: 30
+    steps:
+      - name: Harden the runner (Audit all outbound calls)
+        uses: step-security/harden-runner@46b06cea07f9e64621fdf066ba77ac6915163d43
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version: '1.27.3'
+          cache: false
+      - name: Scan exact provider source against current advisories
+        run: python3 scripts/build_secure_provider.py --go "$(command -v go)" --platform linux_amd64 --output "$RUNNER_TEMP/provider-scan" --scan-only
+      - name: Retain fresh vulnerability evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: provider-fresh-scan
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/provider-scan/*.log
+            ${{ runner.temp }}/provider-scan/source-scan.json
+            ${{ runner.temp }}/provider-scan/stage-timings.jsonl
   provider_unit_tests:
+    needs: select
+    if: ${{ needs.select.outputs.mode == 'full' }}
     name: Provider unit tests / shard ${{ matrix.shard }}
     runs-on: ${{ fromJSON((vars.CI_RUNNER_MODE == 'self-hosted' || vars.CI_RUNNER_MODE == 'k3s') && ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || (contains(fromJSON('["push","schedule","workflow_dispatch"]'), github.event_name) && github.ref == format('refs/heads/{0}', github.event.repository.default_branch))) && (vars.CI_RUNNER_LABELS || '[]') || '["ubuntu-latest"]') }}
     timeout-minutes: 110
     strategy:
       fail-fast: false
+      max-parallel: 4
       matrix:
         shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
     steps:
@@ -45,6 +115,9 @@ jobs:
               cp "$log" "$directory/shard-$SHARD_INDEX-$(basename "$log")"
             fi
           done
+          if [ -f "$directory/stage-timings.jsonl" ]; then
+            cp "$directory/stage-timings.jsonl" "$directory/shard-$SHARD_INDEX-timings.jsonl"
+          fi
       - name: Retain partition receipt and diagnostics
         if: ${{ always() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
@@ -55,9 +128,10 @@ jobs:
           path: |
             ${{ runner.temp }}/provider-shard/shard-*.json
             ${{ runner.temp }}/provider-shard/shard-*.log
+            ${{ runner.temp }}/provider-shard/shard-*.jsonl
   validate:
-    needs: provider_unit_tests
-    if: ${{ always() }}
+    needs: [select, provider_unit_tests]
+    if: ${{ always() && needs.select.outputs.mode == 'full' }}
     name: Repository validation
     runs-on: ${{ fromJSON((vars.CI_RUNNER_MODE == 'self-hosted' || vars.CI_RUNNER_MODE == 'k3s') && ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || (contains(fromJSON('["push","schedule","workflow_dispatch"]'), github.event_name) && github.ref == format('refs/heads/{0}', github.event.repository.default_branch))) && (vars.CI_RUNNER_LABELS || '[]') || '["ubuntu-latest"]') }}
     timeout-minutes: 90
@@ -162,3 +236,4 @@ jobs:
             ${{ runner.temp }}/cloudflare-patched/go.mod
             ${{ runner.temp }}/cloudflare-patched/go.sum
             ${{ runner.temp }}/cloudflare-patched/UPSTREAM-LICENSE
+            ${{ runner.temp }}/cloudflare-patched/stage-timings.jsonl

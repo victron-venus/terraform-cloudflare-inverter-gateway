@@ -80,6 +80,33 @@ Terraform/OpenTofu transport, mocked-plan and actual-wrapper checks follow only
 after this reconciliation. These internal CI options do not change the default
 standalone command above, which still executes the entire suite itself.
 
+### Shared runner capacity and scheduled scans
+
+Full qualification keeps all sixteen partitions but runs at most four at a time.
+This bounds provider tests to four runners instead of occupying sixteen slots in
+the organization's shared queue. A cold qualification can consequently take up
+to four waves plus final validation; this trades wall time for capacity available
+to other projects. Stage durations and success/failure are retained in
+`stage-timings.jsonl` so preparation, compilation and scanning costs can be
+measured separately. Compiler/module caches remain isolated between jobs.
+
+Every push, pull request and manual invocation requires full qualification.
+A scheduled run may reuse a successful default-branch push/manual qualification
+of the **exact checkout SHA** from the same repository, at most **seven days**
+old. The selector verifies all sixteen successful jobs and final validation,
+GitHub artifact digests, pinned source/modules/toolchain/script hashes, complete
+package inventory and every receipt/log using the same reconciler as a full
+build. Missing, expired, duplicated, inconsistent or inaccessible evidence falls
+back to full qualification. Scheduled runs do not refresh this trust window;
+after it expires they run the complete suite again.
+
+Even when reuse is allowed, a new isolated `--scan-only` invocation verifies the
+source archive and module hashes and queries current vulnerability advisories.
+It emits `source-scan.json`, logs and timings, **no binary or new unit-test
+qualification**. The required gate still fails on a scanner error. Full runs
+also retain their existing fresh scans, TLS tests, production build and policy
+checks. Nothing installs the provider or performs a live Terraform apply.
+
 Package
 completion output is also streamed during the run. An interrupted or timed-out
 stage stops its entire compiler process group and cannot produce completed

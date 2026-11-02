@@ -156,7 +156,13 @@ class ProviderShardTests(unittest.TestCase):
             if step.get("name") == "Test exact provider package partition"
         )
         self.assertIn("--test-shards 16", shard_command)
-        self.assertEqual(final["needs"], "provider_unit_tests")
+        self.assertEqual(final["needs"], ["select", "provider_unit_tests"])
+        self.assertEqual(shards["strategy"]["max-parallel"], 4)
+        self.assertIn("needs.select.outputs.mode == 'full'", shards["if"])
+        self.assertIn("needs.select.outputs.mode == 'full'", final["if"])
+        scan = workflow["jobs"]["provider_scan"]
+        self.assertIn("needs.select.outputs.mode == 'scan'", scan["if"])
+        self.assertTrue(any("--scan-only" in step.get("run", "") for step in scan["steps"]))
         guard = final["steps"][0]
         self.assertEqual(
             guard["env"]["UNIT_RESULT"], "${{ needs.provider_unit_tests.result }}"
