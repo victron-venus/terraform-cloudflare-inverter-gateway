@@ -8,13 +8,16 @@ provider source and updates its compiler and Go dependency graph. It is a
 
 `security/provider/manifest.json` pins the original upstream commit and archive
 SHA-256, the exact replacement `go.mod`/`go.sum` hashes, Go 1.27.3, and the scanner
-version. The direct updates are x/net 0.60.0, x/text 0.42.0, x/crypto 0.57.0 and
+version. The direct updates are x/net 0.62.0, x/text 0.43.0, x/crypto 0.58.0 and
 gRPC 1.83.2; their required transitive updates are visible in the module files.
 The derivative also pins Goldmark 1.7.17, which fixes
 [GO-2026-5320](https://pkg.go.dev/vuln/GO-2026-5320) in the documentation dependency graph.
 This change does not establish that the provider runtime exposes the affected HTML renderer.
+The x/net update removes the affected HTML parser and renderer versions in
+[GO-2026-6860](https://pkg.go.dev/vuln/GO-2026-6860) and
+[GO-2026-6866](https://pkg.go.dev/vuln/GO-2026-6866) from the selected module graph.
 No provider resource implementation is patched. The internal version string is
-`5.24.0-openssf.3`, and the original Apache-2.0 license is retained with the output.
+`5.24.0-openssf.4`, and the original Apache-2.0 license is retained with the output.
 The compiler update addresses [GO-2026-6809](https://pkg.go.dev/vuln/GO-2026-6809),
 which adds rejection of distrusted intermediate certificates in `crypto/x509`.
 It requires fresh qualification; receipts from a Go 1.27.2 build do not qualify
