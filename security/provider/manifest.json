@@ -5,12 +5,12 @@
   "source_root": "terraform-provider-cloudflare-4f360d592a7d968c684a9b212c26808534b7c0d3",
   "provider_address": "registry.terraform.io/cloudflare/cloudflare",
   "upstream_version": "5.24.0",
-  "build_version": "5.24.0-openssf.3",
+  "build_version": "5.24.0-openssf.4",
   "binary_name": "terraform-provider-cloudflare_v5.24.0",
   "go_version": "go1.27.3",
   "govulncheck_version": "v1.9.0",
   "module_files": {
-    "go.mod": "0445e963cfd7509177fa2664c62e232a603d85179844885edfd20a4c5381e103",
-    "go.sum": "aa6b503f22d3b307d1876727b4fd6ca0c9d74194e4a29e2a15aee50ca458dcd0"
+    "go.mod": "1cd6277f7e56a82a69df381e0ef9547d818d67072b4d4c9cc02dd3fdb2181bcb",
+    "go.sum": "061f95edea5f2879018cc37429b1c63b1c4ffa193f1b4338a3af7b8cbb2bf635"
   }
 }

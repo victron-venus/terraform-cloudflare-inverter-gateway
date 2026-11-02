@@ -1,5 +1,19 @@
 # Source change history
 
+## 2026-11-02
+
+### Security
+
+- Select the disclosed `5.24.0-openssf.4` provider build with x/net 0.62.0 and
+  its required companion module updates. Preserve the upstream provider source
+  and all module requirements. Fresh sixteen-shard unit qualification and the
+  existing production/TLS checks remain required; no infrastructure is applied.
+
+### CI
+
+- Use GitHub native auto-merge after approval and required checks, preserving
+  the existing CI gate, CodeQL and Sonar requirements without a long polling job.
+
 ## 2026-10-22
 
 ### Security
