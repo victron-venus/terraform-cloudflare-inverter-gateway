@@ -7,6 +7,7 @@
     "custom.jsonata",
     "custom.regex",
     "github-actions",
+    "pip-compile",
     "pip_requirements",
     "terraform"
   ],
@@ -16,24 +17,26 @@
     "**/fixtures/**",
     "**/tools/browser-compatibility/**",
     "security/provider/**",
-    "build-support/tls-armv7/**",
-    "requirements-security-tests.txt"
+    "build-support/tls-armv7/**"
   ],
-  "packageRules": [
-    {
-      "description": "Generated lock outputs are refreshed with their existing source workflow; their uv command headers are not supported by the pinned pip-compile manager.",
-      "matchManagers": [
-        "pip_requirements"
-      ],
-      "matchFileNames": [
-        "requirements-security-tests.txt"
-      ],
-      "enabled": false
-    }
-  ],
+  "packageRules": [],
   "pip_requirements": {
     "managerFilePatterns": [
       "/(^|/)requirements[^/]*\\.(txt|pip)$/"
+    ],
+    "ignorePaths": [
+      "**/vendor/**",
+      "**/node_modules/**",
+      "**/fixtures/**",
+      "**/tools/browser-compatibility/**",
+      "security/provider/**",
+      "build-support/tls-armv7/**",
+      "requirements-security-tests.txt"
+    ]
+  },
+  "pip-compile": {
+    "managerFilePatterns": [
+      "/^requirements\\-security\\-tests\\.txt$/"
     ]
   }
 }
