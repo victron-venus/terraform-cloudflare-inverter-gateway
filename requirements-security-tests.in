@@ -1,3 +1,4 @@
+# Regenerate with uv pip compile requirements-security-tests.in --generate-hashes --universal --python-version=3.12 --output-file=requirements-security-tests.txt
 # Synthetic certificate fixtures; no live credentials or infrastructure.
 cryptography==50.0.2
 cffi==2.1.1
