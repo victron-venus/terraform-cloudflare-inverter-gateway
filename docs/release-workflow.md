@@ -2,8 +2,11 @@
 
 The source of truth is `.release-policy.json`. `quality-gate.yml` runs the callable
 validation workflows and produces the required **CI gate** status on every PR
-and merge-queue commit. Missing, failed and skipped validation workflows fail
-the gate. Workflow and lockfile changes are included in validation.
+and merge-queue commit. Missing, failed, cancelled or unexpectedly skipped
+validation workflows fail the gate. Proven documentation-only changes may skip
+build validators while CodeQL, CI configuration contracts and the gate remain
+required. Workflow and lockfile changes keep full validation. See the
+[documentation scope and regeneration instructions](CI_WORKFLOW.md#documentation-only-changes).
 
 ## Local checks
 
