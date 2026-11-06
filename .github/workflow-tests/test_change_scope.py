@@ -54,9 +54,12 @@ class ScopeIntegrationTests(unittest.TestCase):
     def test_policy_keeps_required_security_and_existing_schedule(self):
         policy = json.loads((ROOT / ".release-policy.json").read_text())
         self.assertEqual(policy["change_scope"], {
-            "documentation_paths": [], "required_paths": [],
+            "documentation_paths": ["GOVERNANCE.md"], "required_paths": [],
             "always_validate_workflows": ["codeql.yml"],
         })
+        classifier = next(s for s in self.jobs["scope"]["steps"] if s.get("id") == "scope")
+        self.assertEqual(json.loads(classifier["env"]["DOCUMENTATION_PATHS"]), ["GOVERNANCE.md"])
+        self.assertEqual(json.loads(classifier["env"]["REQUIRED_PATHS"]), [])
         self.assertEqual(self.workflow["on"]["schedule"], [{"cron": "37 2 * * *"}])
         self.assertEqual(self.workflow["on"]["pull_request"], {})
         self.assertEqual(self.workflow["on"]["merge_group"], {})
@@ -145,6 +148,37 @@ class ScopeIntegrationTests(unittest.TestCase):
             self.assertTrue(SCOPE.classify(root, "pull_request", payload)["run"])
             payload["pull_request"]["base"]["sha"] = "f" * 40
             self.assertTrue(SCOPE.classify(root, "pull_request", payload)["run"])
+
+            (root / "GOVERNANCE.md").write_text("Original governance documentation\n")
+            governance_base = commit()
+            (root / "GOVERNANCE.md").write_text("Updated governance documentation\n")
+            governance_head = commit()
+            allowed = ("GOVERNANCE.md",)
+            governance_events = {
+                "pull_request": {"pull_request": {
+                    "base": {"sha": governance_base}, "head": {"sha": governance_head},
+                }},
+                "push": {"before": governance_base, "after": governance_head},
+                "merge_group": {"merge_group": {
+                    "base_sha": governance_base, "head_sha": governance_head,
+                }},
+            }
+            for event, payload in governance_events.items():
+                with self.subTest(governance_event=event):
+                    self.assertTrue(SCOPE.classify(root, event, payload)["run"])
+                    self.assertEqual(SCOPE.classify(root, event, payload, allowed), {
+                        "run": False, "reason": "documentation-only",
+                    })
+                    self.assertTrue(SCOPE.classify(root, event, payload, allowed, force=True)["run"])
+                    self.assertTrue(SCOPE.classify(
+                        root, event, payload, allowed, required_paths=allowed,
+                    )["run"])
+            (root / "main.tf").write_text("# Code change after governance update\n")
+            mixed_head = commit()
+            mixed = {"pull_request": {
+                "base": {"sha": governance_base}, "head": {"sha": mixed_head},
+            }}
+            self.assertTrue(SCOPE.classify(root, "pull_request", mixed, allowed)["run"])
 
 
 if __name__ == "__main__":
