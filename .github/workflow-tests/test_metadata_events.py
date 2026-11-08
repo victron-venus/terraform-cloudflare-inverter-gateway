@@ -63,6 +63,8 @@ def evaluate(expression: str, context: dict[str, object]):
                 return json.loads(args[0])
             if node.func.id == "contains" and len(args) == 2:
                 return args[1] in args[0]
+            if node.func.id == "format" and args:
+                return args[0].format(*args[1:])
         message = f"Unsupported metadata expression: {expression}"
         raise AssertionError(message)
 
@@ -156,7 +158,8 @@ class MetadataEventsTests(unittest.TestCase):
                 assert active == retargeted
                 assert ignored not in (active, pending)
                 assert ignored != next_ignored
-                assert workflow["concurrency"]["cancel-in-progress"] == "true"
+                expected_cancel = "false" if name == CALLERS[1] else "true"
+                assert workflow["concurrency"]["cancel-in-progress"] == expected_cancel
                 for trigger in workflow["on"].values():
                     assert "edited" in trigger["types"]
                     assert "converted_to_draft" in trigger["types"]
@@ -198,6 +201,48 @@ class MetadataEventsTests(unittest.TestCase):
                         bool(evaluate(condition, data)),
                         event == "pull_request_target" and base == "main",
                     )
+
+    def test_withdrawals_survive_later_positive_and_ignored_events(self):
+        """Every withdrawal keeps a queue slot without cancelling the positive waiter."""
+        workflow = definition(CALLERS[1])
+        assert workflow["concurrency"]["cancel-in-progress"] == "false"
+        for action in ("unlabeled", "converted_to_draft", "edited"):
+            withdrawals = []
+            for run in ("20", "21"):
+                data = context(action, run=run)
+                event = data["github"]["event"]
+                event["label"] = {"name": "automerge"}
+                if action == "edited":
+                    event["changes"] = {"base": {"ref": {"from": "main"}}}
+                    event["pull_request"]["base"]["ref"] = "other"
+                withdrawals.append(data)
+            later = [
+                context("synchronize", run="22"),
+                context("labeled", run="23"),
+                context("edited", {"body": {"from": "old"}}, run="24"),
+            ]
+            pending = {group(workflow, event): event for event in withdrawals + later}
+            with self.subTest(action=action):
+                for event in withdrawals:
+                    assert event in pending.values()
+                    assert evaluate(workflow["jobs"]["auto-merge"]["if"], event)
+                assert group(workflow, withdrawals[0]) != group(workflow, withdrawals[1])
+                assert all(
+                    group(workflow, event) != group(workflow, following)
+                    for event in withdrawals
+                    for following in later
+                )
+
+    def test_nonwithdrawals_keep_the_positive_queue(self):
+        """Unrelated label removal and a return to main are not withdrawal evidence."""
+        workflow = definition(CALLERS[1])
+        expected = group(workflow, context("opened"))
+        unrelated = context("unlabeled", run="30")
+        unrelated["github"]["event"]["label"] = {"name": "documentation"}
+        returned = context("edited", {"base": {"ref": {"from": "other"}}}, run="31")
+        for event in (unrelated, returned, context("synchronize", run="32")):
+            with self.subTest(event=event):
+                assert group(workflow, event) == expected
 
 
 if __name__ == "__main__":
