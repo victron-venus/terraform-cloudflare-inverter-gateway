@@ -7,7 +7,7 @@ provider source and updates its compiler and Go dependency graph. It is a
 **project-maintained derivative**, not an official Cloudflare release.
 
 `security/provider/manifest.json` pins the original upstream commit and archive
-SHA-256, the exact replacement `go.mod`/`go.sum` hashes, Go 1.27.3, and the scanner
+SHA-256, the exact replacement `go.mod`/`go.sum` hashes, Go 1.27.4, and the scanner
 version. The direct updates are x/net 0.62.0, x/text 0.43.0, x/crypto 0.58.0 and
 gRPC 1.83.2; their required transitive updates are visible in the module files.
 The derivative also pins Goldmark 1.7.17, which fixes
@@ -25,7 +25,7 @@ this derivative. Existing installed providers are not updated by this source cha
 
 ## Build and qualify
 
-Install an official Go 1.27.3 archive after checking its publisher SHA-256.
+Install an official Go 1.27.4 archive after checking its publisher SHA-256.
 The Python source downloader requires OpenSSL 3 and applies security level 3
 (with any stronger existing policy preserved), hostname/trust verification and
 TLS 1.2 or newer. This rejects RSA keys below 3072 bits throughout the chain;
