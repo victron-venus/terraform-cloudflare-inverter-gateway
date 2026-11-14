@@ -7,7 +7,7 @@
   "upstream_version": "5.24.0",
   "build_version": "5.24.0-openssf.4",
   "binary_name": "terraform-provider-cloudflare_v5.24.0",
-  "go_version": "go1.27.3",
+  "go_version": "go1.27.4",
   "govulncheck_version": "v1.9.0",
   "module_files": {
     "go.mod": "1cd6277f7e56a82a69df381e0ef9547d818d67072b4d4c9cc02dd3fdb2181bcb",

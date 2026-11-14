@@ -57,7 +57,7 @@ jobs:
           python-version: '3.12'
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.27.3'
+          go-version: '1.27.4'
           cache: false
       - name: Scan exact provider source against current advisories
         run: python3 scripts/build_secure_provider.py --go "$(command -v go)" --platform linux_amd64 --output "$RUNNER_TEMP/provider-scan" --scan-only
@@ -96,7 +96,7 @@ jobs:
           python-version: '3.12'
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.27.3'
+          go-version: '1.27.4'
           cache: false
       - name: Test exact provider package partition
         env:
@@ -185,12 +185,16 @@ jobs:
           terraform providers mirror -platform=linux_amd64 "$mirror"
           provider_dir="$RUNNER_TEMP/tls-provider"
           mkdir -p "$provider_dir"
-          unzip "$mirror/registry.terraform.io/cloudflare/cloudflare/terraform-provider-cloudflare_5.24.0_linux_amd64.zip" -d "$provider_dir"
+          archives=("$mirror"/registry.terraform.io/cloudflare/cloudflare/terraform-provider-cloudflare_*_linux_amd64.zip)
+          [[ ${#archives[@]} -eq 1 && -f "${archives[0]}" ]]
+          unzip "${archives[0]}" -d "$provider_dir"
           TLS_TEST_TERRAFORM="$(command -v terraform)"
           export TLS_TEST_TERRAFORM
           export TLS_TEST_PROVIDER_DIR="$provider_dir"
           go version -m "$TLS_TEST_TERRAFORM"
-          go version -m "$provider_dir/terraform-provider-cloudflare_v5.24.0"
+          binaries=("$provider_dir"/terraform-provider-cloudflare_v*)
+          [[ ${#binaries[@]} -eq 1 && -f "${binaries[0]}" ]]
+          go version -m "${binaries[0]}"
           "$RUNNER_TEMP/tls-test-venv/bin/python" scripts/test_tls_profile.py
       - name: Validate the FLOSS OpenTofu compatibility profile
         run: |
@@ -204,7 +208,7 @@ jobs:
       - name: Install pinned compiler for the disclosed provider patch
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.27.3'
+          go-version: '1.27.4'
           cache: false
       - name: Download current-run provider test receipts
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2

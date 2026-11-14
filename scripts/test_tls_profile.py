@@ -11,6 +11,7 @@ import io
 import json
 import os
 import pathlib
+import re
 import shutil
 import ssl
 import subprocess
@@ -27,6 +28,21 @@ from cryptography.x509.oid import NameOID
 TF = pathlib.Path(os.environ["TLS_TEST_TERRAFORM"]).resolve()
 PROV = pathlib.Path(os.environ["TLS_TEST_PROVIDER_DIR"]).resolve()
 PLATFORM = os.environ["TLS_TEST_PLATFORM"]
+
+
+def selected_provider_version(directory):
+    """Require one explicit official or derivative binary, never an inferred latest."""
+    binaries = list(directory.glob("terraform-provider-cloudflare_v*"))
+    if len(binaries) != 1 or not binaries[0].is_file():
+        raise ValueError("TLS fixture requires exactly one selected provider binary")
+    match = re.fullmatch(
+        r"terraform-provider-cloudflare_v(\d+\.\d+\.\d+)(?:_x\d+)?",
+        binaries[0].name,
+        re.ASCII,
+    )
+    if match is None:
+        raise ValueError("TLS fixture provider binary has an invalid version name")
+    return match.group(1)
 
 
 def engine_command(command, arguments, root, strict):
@@ -53,6 +69,7 @@ def engine_command(command, arguments, root, strict):
 
 
 def run(bits, strict, mode):
+    provider_version = selected_provider_version(PROV)
     with tempfile.TemporaryDirectory() as td:
         p = pathlib.Path(td)
         key = rsa.generate_private_key(public_exponent=65537, key_size=bits)
@@ -134,12 +151,12 @@ def run(bits, strict, mode):
                 if mode == "module"
                 else ""
             )
-            + 'terraform {\n required_providers {\n cloudflare = { source="registry.terraform.io/cloudflare/cloudflare", version="5.24.0" }\n }\n }\nprovider "cloudflare" {\n api_token="synthetic-test-token-00000000000000000000"\n base_url="https://localhost:'
+            + 'terraform {\n required_providers {\n cloudflare = { source="registry.terraform.io/cloudflare/cloudflare", version="' + provider_version + '" }\n }\n }\nprovider "cloudflare" {\n api_token="synthetic-test-token-00000000000000000000"\n base_url="https://localhost:'
             + str(port)
             + '/"\n }\ndata "cloudflare_zone" "probe" { zone_id="00000000000000000000000000000000" }\n'
         )
         mirror = (
-            p / "mirror/registry.terraform.io/cloudflare/cloudflare/5.24.0" / PLATFORM
+            p / "mirror/registry.terraform.io/cloudflare/cloudflare" / provider_version / PLATFORM
         )
         mirror.parent.mkdir(parents=True)
         shutil.copytree(PROV, mirror)
