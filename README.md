@@ -115,3 +115,11 @@ retain the runtime findings documented in the dependency review.
 Provider qualification caps concurrent test shards at four; scheduled scans can
 reuse a verified same-commit qualification for seven days while checking current
 advisories each time. See [runner capacity and qualification evidence](docs/SECURE_PROVIDER.md#shared-runner-capacity-and-scheduled-scans).
+
+## Related Projects
+
+| Project | Description |
+|---------|-------------|
+| [terraform-github-victron](https://github.com/4alvit/terraform-github-victron) | Repositories and org settings for the victron-venus organization |
+| [inverter-gateway](https://github.com/victron-venus/inverter-gateway) | The gateway service these edge resources front |
+| [inverter-dashboard](https://github.com/victron-venus/inverter-dashboard) | Dashboard reached through this edge configuration |
